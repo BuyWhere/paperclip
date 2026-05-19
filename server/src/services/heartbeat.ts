@@ -46,6 +46,11 @@ import { conflict, HttpError, notFound } from "../errors.js";
 import { logger } from "../middleware/logger.js";
 import { publishLiveEvent } from "./live-events.js";
 import { getRunLogStore, type RunLogHandle } from "./run-log-store.js";
+import {
+  hydrateWorkspaceForRun,
+  publishWorkspaceAfterRun,
+  getWorkspaceHead,
+} from "./workspace-bootstrap.js";
 import { getServerAdapter, listAdapterModelProfiles, runningProcesses } from "../adapters/index.js";
 import type {
   AdapterExecutionResult,
@@ -7268,6 +7273,41 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
         })
         .where(eq(heartbeatRuns.id, run.id));
     }
+    let workspaceHydrationResult: { hydrated: boolean; revisionId: string | null } = { hydrated: false, revisionId: null };
+    let workspaceHeadForPublish: { revisionId: string | null; version: number | null } = { revisionId: null, version: null };
+    if (issueId) {
+      try {
+        workspaceHeadForPublish = await getWorkspaceHead({ db, issueId });
+        if (workspaceHeadForPublish.revisionId && executionWorkspace.cwd) {
+          workspaceHydrationResult = await hydrateWorkspaceForRun({
+            db,
+            companyId: agent.companyId,
+            issueId,
+            targetDir: executionWorkspace.cwd,
+          });
+          if (workspaceHydrationResult.hydrated) {
+            context.paperclipWorkspaceHydration = {
+              revisionId: workspaceHydrationResult.revisionId,
+              fileCount: workspaceHydrationResult.fileCount,
+              bytes: workspaceHydrationResult.bytes,
+            };
+            await db
+              .update(heartbeatRuns)
+              .set({ contextSnapshot: context, updatedAt: new Date() })
+              .where(eq(heartbeatRuns.id, run.id));
+          }
+        }
+      } catch (hydrationError) {
+        logger.warn(
+          {
+            runId: run.id,
+            issueId,
+            error: hydrationError instanceof Error ? hydrationError.message : String(hydrationError),
+          },
+          "Workspace hydration step failed — continuing without hydration",
+        );
+      }
+    }
     const persistedEnvironmentId = persistedExecutionWorkspace?.config?.environmentId ?? selectedEnvironmentId;
     const acquiredEnvironment = await envOrchestrator.acquireForRun({
       companyId: agent.companyId,
@@ -7793,6 +7833,36 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
       }
       await flushOutputProgress({ force: true });
 
+      let workspacePublishResult = { published: false, revisionId: null as string | null, version: null as number | null, conflict: false };
+      if (issueId && outcome === "succeeded" && executionWorkspace.cwd) {
+        try {
+          workspacePublishResult = await publishWorkspaceAfterRun({
+            db,
+            companyId: agent.companyId,
+            issueId,
+            runId: run.id,
+            workspaceDir: executionWorkspace.cwd,
+            parentRevisionId: workspaceHeadForPublish.revisionId,
+            expectedVersion: workspaceHeadForPublish.version,
+          });
+          if (workspacePublishResult.conflict) {
+            logger.info(
+              { runId: run.id, issueId },
+              "Workspace publish detected stale lease — workspace head was updated by a concurrent run",
+            );
+          }
+        } catch (publishError) {
+          logger.warn(
+            {
+              runId: run.id,
+              issueId,
+              error: publishError instanceof Error ? publishError.message : String(publishError),
+            },
+            "Workspace publish failed — run result still persisted",
+          );
+        }
+      }
+
       const status =
         outcome === "succeeded"
           ? "succeeded"
@@ -7843,6 +7913,14 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
         }),
         adapterResult.summary ?? null,
       );
+
+      if (workspacePublishResult.published) {
+        (persistedResultJson as Record<string, unknown>)._workspaceRevision = {
+          revisionId: workspacePublishResult.revisionId,
+          version: workspacePublishResult.version,
+          conflict: workspacePublishResult.conflict,
+        };
+      }
 
       let persistedRun = await setRunStatus(run.id, status, {
         finishedAt: new Date(),
