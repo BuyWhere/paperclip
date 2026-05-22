@@ -1,0 +1,430 @@
+'use client'
+
+import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import { DOMAINS, getDomain } from '@/lib/domains'
+import { getOnboardingState, saveOnboardingState } from '@/lib/storage'
+import type { DomainId, GoalDefinition, CheckMethod } from '@/lib/types'
+
+const CHECK_METHODS: { id: CheckMethod; label: string; icon: string; description: string }[] = [
+  { id: 'binary', label: 'Binary', icon: '✅', description: 'Done or not done' },
+  { id: 'numeric', label: 'Numeric', icon: '📊', description: 'Track a number' },
+  { id: 'time', label: 'Time-based', icon: '⏱', description: 'Hours or minutes' },
+  { id: 'streak', label: 'Streak', icon: '🔥', description: 'Consecutive days' },
+  { id: 'milestone', label: 'Milestone', icon: '🏁', description: 'Step-by-step' },
+]
+
+export default function DefinePage() {
+  const router = useRouter()
+  const [domains, setDomains] = useState<DomainId[]>([])
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [goals, setGoals] = useState<Partial<Record<DomainId, GoalDefinition>>>({})
+  const [suggestion, setSuggestion] = useState('')
+  const nameRef = useRef<HTMLInputElement>(null)
+
+  // Current domain
+  const currentDomain = domains[currentIndex] ? getDomain(domains[currentIndex]) : null
+  const currentGoal: GoalDefinition = goals[domains[currentIndex]] ?? {
+    domainId: domains[currentIndex] ?? 'career',
+    name: '',
+    definition: '',
+    checkMethod: currentDomain?.defaultCheckMethod ?? 'binary',
+    checkConfig: {},
+  }
+
+  useEffect(() => {
+    const state = getOnboardingState()
+    if (state.selectedDomains.length === 0) {
+      router.push('/onboarding/goals')
+      return
+    }
+    setDomains(state.selectedDomains)
+    setGoals(state.goals)
+  }, [])
+
+  useEffect(() => {
+    if (nameRef.current) nameRef.current.focus()
+    setSuggestion('')
+  }, [currentIndex])
+
+  function updateGoal(patch: Partial<GoalDefinition>) {
+    const domainId = domains[currentIndex]
+    setGoals(prev => ({
+      ...prev,
+      [domainId]: { ...currentGoal, ...patch, domainId },
+    }))
+  }
+
+  function handleNameChange(value: string) {
+    updateGoal({ name: value })
+    // Suggest from domain suggestions
+    if (value.length >= 2 && currentDomain) {
+      const match = currentDomain.suggestions.find(s =>
+        s.toLowerCase().startsWith(value.toLowerCase()) && s.toLowerCase() !== value.toLowerCase()
+      )
+      setSuggestion(match ? match.slice(value.length) : '')
+    } else {
+      setSuggestion('')
+    }
+  }
+
+  function acceptSuggestion() {
+    if (suggestion && currentGoal.name) {
+      updateGoal({ name: currentGoal.name + suggestion })
+      setSuggestion('')
+    }
+  }
+
+  function handleNext() {
+    const domainId = domains[currentIndex]
+    if (!currentGoal.name.trim()) return
+
+    const updatedGoals = {
+      ...goals,
+      [domainId]: { ...currentGoal, domainId },
+    }
+    setGoals(updatedGoals)
+
+    if (currentIndex < domains.length - 1) {
+      setCurrentIndex(i => i + 1)
+    } else {
+      saveOnboardingState({ goals: updatedGoals })
+      router.push('/onboarding/projects')
+    }
+  }
+
+  function handleBack() {
+    if (currentIndex > 0) {
+      setCurrentIndex(i => i - 1)
+    } else {
+      router.push('/onboarding/goals')
+    }
+  }
+
+  if (!currentDomain) return null
+
+  const domain = currentDomain
+  const isLast = currentIndex === domains.length - 1
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: '#080808',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      padding: '3rem 1.5rem',
+    }}>
+      {/* Header */}
+      <div style={{ maxWidth: 560, width: '100%', marginBottom: '2.5rem' }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '2rem',
+        }}>
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            background: '#111',
+            border: '1px solid #1e1e1e',
+            borderRadius: '999px',
+            padding: '0.375rem 1rem',
+            fontSize: '0.75rem',
+            color: '#666',
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+          }}>
+            <span style={{ width: 6, height: 6, background: '#10b981', borderRadius: '50%', display: 'inline-block' }} />
+            Step 2 of 6 — Define Goals
+          </div>
+
+          {/* Domain progress dots */}
+          <div style={{ display: 'flex', gap: '0.375rem' }}>
+            {domains.map((d, i) => {
+              const dm = getDomain(d)
+              return (
+                <div
+                  key={d}
+                  style={{
+                    width: i === currentIndex ? 20 : 8,
+                    height: 8,
+                    borderRadius: '999px',
+                    background: i <= currentIndex ? (dm?.color ?? '#666') : '#1a1a1a',
+                    transition: 'all 0.3s ease',
+                  }}
+                />
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Domain header */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '1rem',
+          padding: '1.25rem',
+          background: `${domain.color}10`,
+          border: `1px solid ${domain.color}30`,
+          borderRadius: '12px',
+          marginBottom: '2rem',
+        }}>
+          <div style={{ fontSize: '2.5rem' }}>{domain.icon}</div>
+          <div>
+            <div style={{ fontSize: '0.7rem', color: domain.color, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '0.2rem' }}>
+              Domain {currentIndex + 1} of {domains.length}
+            </div>
+            <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#ededed', letterSpacing: '-0.02em' }}>
+              {domain.label}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Goal form */}
+      <div style={{ maxWidth: 560, width: '100%', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+
+        {/* Goal name */}
+        <div>
+          <label style={{ display: 'block', fontSize: '0.8rem', color: '#666', marginBottom: '0.5rem', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+            Goal Name
+          </label>
+          <div style={{ position: 'relative' }}>
+            <input
+              ref={nameRef}
+              type="text"
+              value={currentGoal.name}
+              onChange={e => handleNameChange(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Tab' && suggestion) {
+                  e.preventDefault()
+                  acceptSuggestion()
+                }
+              }}
+              placeholder={domain.suggestions[0]}
+              style={{
+                width: '100%',
+                padding: '0.875rem 1rem',
+                background: '#0f0f0f',
+                border: `1px solid ${currentGoal.name ? domain.color + '50' : '#1e1e1e'}`,
+                borderRadius: '10px',
+                color: '#ededed',
+                fontSize: '1rem',
+                outline: 'none',
+                transition: 'border-color 0.15s',
+                boxSizing: 'border-box',
+              }}
+            />
+            {/* Ghost suggestion */}
+            {suggestion && (
+              <div style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                padding: '0.875rem 1rem',
+                fontSize: '1rem',
+                color: 'transparent',
+                pointerEvents: 'none',
+                userSelect: 'none',
+              }}>
+                <span style={{ color: 'transparent' }}>{currentGoal.name}</span>
+                <span style={{ color: '#333' }}>{suggestion}</span>
+                <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', color: '#333', background: '#1a1a1a', padding: '0.1rem 0.3rem', borderRadius: '4px' }}>tab</span>
+              </div>
+            )}
+          </div>
+          <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {domain.suggestions.slice(0, 3).map(s => (
+              <button
+                key={s}
+                onClick={() => { updateGoal({ name: s }); setSuggestion('') }}
+                style={{
+                  padding: '0.25rem 0.625rem',
+                  background: '#111',
+                  border: '1px solid #1e1e1e',
+                  borderRadius: '999px',
+                  color: '#555',
+                  fontSize: '0.7rem',
+                  cursor: 'pointer',
+                }}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Goal definition */}
+        <div>
+          <label style={{ display: 'block', fontSize: '0.8rem', color: '#666', marginBottom: '0.5rem', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+            {domain.promptHint}
+          </label>
+          <textarea
+            value={currentGoal.definition}
+            onChange={e => updateGoal({ definition: e.target.value })}
+            placeholder="Be specific — what does success look like in 12 months?"
+            rows={3}
+            style={{
+              width: '100%',
+              padding: '0.875rem 1rem',
+              background: '#0f0f0f',
+              border: '1px solid #1e1e1e',
+              borderRadius: '10px',
+              color: '#ededed',
+              fontSize: '0.9375rem',
+              outline: 'none',
+              resize: 'vertical',
+              fontFamily: 'inherit',
+              lineHeight: 1.5,
+              boxSizing: 'border-box',
+            }}
+          />
+        </div>
+
+        {/* Check method */}
+        <div>
+          <label style={{ display: 'block', fontSize: '0.8rem', color: '#666', marginBottom: '0.75rem', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+            How will you measure this?
+          </label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.5rem' }}>
+            {CHECK_METHODS.map(m => {
+              const isActive = currentGoal.checkMethod === m.id
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => updateGoal({ checkMethod: m.id })}
+                  style={{
+                    padding: '0.75rem 0.5rem',
+                    background: isActive ? `${domain.color}20` : '#0f0f0f',
+                    border: `1px solid ${isActive ? domain.color : '#1e1e1e'}`,
+                    borderRadius: '10px',
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  <div style={{ fontSize: '1.25rem', marginBottom: '0.25rem' }}>{m.icon}</div>
+                  <div style={{ fontSize: '0.65rem', color: isActive ? domain.color : '#555', fontWeight: 600, letterSpacing: '0.02em' }}>
+                    {m.label}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+          <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: '#444', textAlign: 'center' }}>
+            {CHECK_METHODS.find(m => m.id === currentGoal.checkMethod)?.description}
+          </div>
+        </div>
+
+        {/* Check config: numeric/time target */}
+        {(currentGoal.checkMethod === 'numeric' || currentGoal.checkMethod === 'time') && (
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', color: '#666', marginBottom: '0.5rem' }}>Target</label>
+              <input
+                type="number"
+                value={currentGoal.checkConfig.target ?? ''}
+                onChange={e => updateGoal({ checkConfig: { ...currentGoal.checkConfig, target: Number(e.target.value) } })}
+                placeholder="e.g. 100"
+                style={{
+                  width: '100%',
+                  padding: '0.75rem 1rem',
+                  background: '#0f0f0f',
+                  border: '1px solid #1e1e1e',
+                  borderRadius: '10px',
+                  color: '#ededed',
+                  fontSize: '0.9375rem',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', color: '#666', marginBottom: '0.5rem' }}>Unit</label>
+              <input
+                type="text"
+                value={currentGoal.checkConfig.unit ?? ''}
+                onChange={e => updateGoal({ checkConfig: { ...currentGoal.checkConfig, unit: e.target.value } })}
+                placeholder={currentGoal.checkMethod === 'time' ? 'hours' : 'books, pounds, $...'}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem 1rem',
+                  background: '#0f0f0f',
+                  border: '1px solid #1e1e1e',
+                  borderRadius: '10px',
+                  color: '#ededed',
+                  fontSize: '0.9375rem',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Streak target */}
+        {currentGoal.checkMethod === 'streak' && (
+          <div>
+            <label style={{ display: 'block', fontSize: '0.8rem', color: '#666', marginBottom: '0.5rem' }}>
+              Target streak (days)
+            </label>
+            <input
+              type="number"
+              value={currentGoal.checkConfig.target ?? 365}
+              onChange={e => updateGoal({ checkConfig: { target: Number(e.target.value) } })}
+              style={{
+                width: '100%',
+                padding: '0.75rem 1rem',
+                background: '#0f0f0f',
+                border: '1px solid #1e1e1e',
+                borderRadius: '10px',
+                color: '#ededed',
+                fontSize: '0.9375rem',
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
+          </div>
+        )}
+
+        {/* Actions */}
+        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+          <button
+            onClick={handleBack}
+            style={{
+              padding: '0.875rem 1.5rem',
+              background: '#0f0f0f',
+              border: '1px solid #1e1e1e',
+              borderRadius: '10px',
+              color: '#666',
+              fontSize: '0.9375rem',
+              cursor: 'pointer',
+            }}
+          >
+            ←
+          </button>
+          <button
+            onClick={handleNext}
+            disabled={!currentGoal.name.trim()}
+            style={{
+              flex: 1,
+              padding: '0.875rem',
+              background: currentGoal.name.trim() ? '#ededed' : '#1a1a1a',
+              color: currentGoal.name.trim() ? '#080808' : '#333',
+              border: 'none',
+              borderRadius: '10px',
+              fontSize: '0.9375rem',
+              fontWeight: 600,
+              cursor: currentGoal.name.trim() ? 'pointer' : 'not-allowed',
+              letterSpacing: '-0.01em',
+            }}
+          >
+            {isLast ? 'Generate projects with ARCHIE →' : `Next: ${getDomain(domains[currentIndex + 1])?.label} →`}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}

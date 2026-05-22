@@ -1,0 +1,16 @@
+Metadata-Version: 2.4
+Name: 8os-orchestrator
+Version: 0.1.0
+Summary: FastAPI orchestrator skeleton with JWT auth for 8OS
+Requires-Python: >=3.11
+Requires-Dist: asyncpg<0.31.0,>=0.30.0
+Requires-Dist: email-validator<3.0.0,>=2.2.0
+Requires-Dist: fastapi<0.116.0,>=0.115.0
+Requires-Dist: greenlet<4.0.0,>=3.2.0
+Requires-Dist: httpx<0.29.0,>=0.28.0
+Requires-Dist: passlib[bcrypt]<2.0.0,>=1.7.4
+Requires-Dist: pydantic-settings<3.0.0,>=2.8.0
+Requires-Dist: pyjwt<3.0.0,>=2.10.0
+Requires-Dist: redis<6.0.0,>=5.2.0
+Requires-Dist: sqlalchemy<3.0.0,>=2.0.40
+Requires-Dist: uvicorn[standard]<0.35.0,>=0.34.0

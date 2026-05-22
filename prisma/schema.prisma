@@ -1,0 +1,488 @@
+// Prisma schema for 8os auth system
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  user
+  premium
+  pro
+  admin
+}
+
+enum OtpChannel {
+  sms
+  whatsapp
+  email
+}
+
+enum AffiliateStatus {
+  pending
+  active
+  paused
+}
+
+enum AffiliatePayoutStatus {
+  pending
+  exported
+  paid
+}
+
+model User {
+  id                String    @id @default(uuid())
+  email             String?   @unique
+  phone             String?   @unique
+  passwordHash      String?
+  emailVerified     Boolean   @default(false)
+  phoneVerified     Boolean   @default(false)
+  role              UserRole  @default(user)
+  onboardingDone    Boolean   @default(false)
+  failedLoginCount  Int       @default(0)
+  lockedUntil       DateTime?
+  totpSecret        String?
+  totpEnabled       Boolean   @default(false)
+  dataDeletedAt     DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  sessions          Session[]
+  otpCodes          OtpCode[]
+  passwordResets    PasswordReset[]
+  oauthAccounts     OauthAccount[]
+  profile           UserProfile?
+  quizResponses     QuizResponse[]
+  archetypeResult   ArchetypeResult?
+  goals             Goal[]
+  projects          OSProject[]
+  tasks             OSTask[]
+  energyProfile     EnergyProfile?
+  calendarEvents    CalendarEvent[]
+  activityLogs      ActivityLog[]
+  settings          UserSettings?
+  dailyInsights     DailyInsight[]
+  insightFeedback   InsightFeedback[]
+  referralAttribution ReferralAttribution?
+  affiliateConversions AffiliateConversion[]
+
+  @@map("users")
+}
+
+model Affiliate {
+  id                   String                 @id @default(uuid())
+  email                String                 @unique
+  name                 String
+  code                 String                 @unique
+  status               AffiliateStatus        @default(active)
+  defaultCommissionBps Int                    @default(3000)
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+
+  referralClicks       ReferralClick[]
+  referralAttributions ReferralAttribution[]
+  conversions          AffiliateConversion[]
+
+  @@map("affiliates")
+}
+
+model ReferralClick {
+  id           String    @id @default(uuid())
+  affiliateId  String
+  codeSnapshot String
+  landingPath  String?
+  utmSource    String?
+  utmMedium    String?
+  utmCampaign  String?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime  @default(now())
+
+  affiliate Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+
+  attributions ReferralAttribution[]
+
+  @@index([affiliateId])
+  @@map("referral_clicks")
+}
+
+model ReferralAttribution {
+  id              String    @id @default(uuid())
+  affiliateId      String
+  userId           String    @unique
+  referralClickId  String?
+  codeSnapshot     String
+  attributedAt     DateTime  @default(now())
+
+  affiliate     Affiliate      @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  referralClick ReferralClick? @relation(fields: [referralClickId], references: [id], onDelete: SetNull)
+
+  @@index([affiliateId])
+  @@index([referralClickId])
+  @@map("referral_attributions")
+}
+
+model AffiliateConversion {
+  id                     String                @id @default(uuid())
+  affiliateId            String
+  userId                 String                @unique
+  subscriptionProvider   String?
+  subscriptionExternalId String?
+  planName               String
+  revenueAmount          Decimal               @db.Decimal(10, 2)
+  revenueCurrency        String
+  commissionAmount       Decimal               @db.Decimal(10, 2)
+  commissionBps          Int
+  conversionAt           DateTime              @default(now())
+  payoutStatus           AffiliatePayoutStatus @default(pending)
+  exportBatchId          String?
+
+  affiliate Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([affiliateId])
+  @@index([payoutStatus, conversionAt])
+  @@map("affiliate_conversions")
+}
+
+model UserProfile {
+  id                  String    @id @default(uuid())
+  userId              String    @unique
+  // Birth data — AES-256 encrypted at rest
+  birthDateEncrypted  String    // ISO date, encrypted
+  birthTimeEncrypted  String?   // HH:MM, encrypted; null if skipped
+  birthTimezone       String?   // IANA tz, e.g. "Asia/Shanghai"
+  birthLocationEncrypted String? // JSON {city,country,lat,lng}, encrypted
+  gender              String    // "male" | "female" | "nonbinary"
+  // BaZi computed fields (non-sensitive, stored plaintext)
+  dayMaster           String    // e.g. "甲" — Day Heavenly Stem
+  dayElement          String    // "wood" | "fire" | "earth" | "metal" | "water"
+  dayPolarity         String    // "yang" | "yin"
+  yearPillar          String    // e.g. "甲子"
+  monthPillar         String    // e.g. "丙寅"
+  dayPillar           String    // e.g. "戊午"
+  hourPillar          String?   // e.g. "壬子" — null if time unknown
+  dominantElement     String    // strongest element across 4 pillars
+  gdprAccepted        Boolean   @default(false)
+  gdprAcceptedAt      DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+model QuizResponse {
+  id              String   @id @default(uuid())
+  userId          String
+  questionId      Int      // 1-10
+  answer          String   // "a" | "b" | "c" | "d"
+  answeredAt      DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, questionId])
+  @@index([userId])
+  @@map("quiz_responses")
+}
+
+model ArchetypeResult {
+  id                  String   @id @default(uuid())
+  userId              String   @unique
+  archetypeId         String   // e.g. "pioneer", "sage"
+  archetypeName       String   // e.g. "The Pioneer"
+  confidence          Float    // 0.0 - 1.0
+  dominantElements    Json     // string[]
+  personalityVector   Json     // { systematic: number, intuitive: number, ... }
+  baziWeight          Float    @default(0.6)
+  quizWeight          Float    @default(0.4)
+  calculationLog      Json     // full breakdown for future refinement
+  isHybrid            Boolean  @default(false)
+  hybridSecondary     String?  // secondary archetype if hybrid
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("archetype_results")
+}
+
+model Session {
+  id           String    @id @default(uuid())
+  userId       String
+  deviceName   String?
+  ipAddress    String?
+  userAgent    String?
+  refreshToken String    @unique
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model OtpCode {
+  id        String     @id @default(uuid())
+  userId    String
+  code      String
+  channel   OtpChannel
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime   @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("otp_codes")
+}
+
+model PasswordReset {
+  id           String    @id @default(uuid())
+  userId       String
+  tokenHash    String    @unique
+  expiresAt    DateTime
+  usedAt       DateTime?
+  createdAt    DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_resets")
+}
+
+model OauthAccount {
+  id           String    @id @default(uuid())
+  userId       String
+  provider     String
+  providerUid  String
+  accessToken  String?
+  refreshToken String?
+  expiresAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUid])
+  @@index([userId])
+  @@map("oauth_accounts")
+}
+
+// ─── Wave 2: Goals, Projects, Tasks, Calendar ─────────────────────────────────
+
+enum GoalStatus {
+  active
+  paused
+  completed
+  archived
+}
+
+enum TaskStatus {
+  todo
+  in_progress
+  done
+  cancelled
+}
+
+enum TaskPriority {
+  high
+  medium
+  low
+}
+
+enum RecurrenceRule {
+  none
+  daily
+  weekly
+  biweekly
+  monthly
+}
+
+model Goal {
+  id          String     @id @default(uuid())
+  userId      String
+  domainId    String     // career | wealth | health | relationships | learning | legacy
+  name        String
+  definition  String
+  checkMethod String     // binary | numeric | time | streak | milestone
+  checkConfig Json       // { unit?, target?, milestones? }
+  status      GoalStatus @default(active)
+  progress    Float      @default(0) // 0.0 - 1.0
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projects OSProject[]
+  activityLogs ActivityLog[]
+
+  @@index([userId])
+  @@map("goals")
+}
+
+model OSProject {
+  id                String   @id @default(uuid())
+  userId            String
+  goalId            String
+  name              String
+  description       String   @default("")
+  estimatedDuration String   @default("1 week")
+  suggestedOrder    Int      @default(0)
+  accepted          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goal  Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  tasks OSTask[]
+
+  @@index([userId])
+  @@index([goalId])
+  @@map("os_projects")
+}
+
+model OSTask {
+  id               String       @id @default(uuid())
+  userId           String
+  projectId        String?
+  goalId           String?
+  name             String
+  notes            String       @default("")
+  duration         Int          @default(60)  // minutes
+  priority         TaskPriority @default(medium)
+  status           TaskStatus   @default(todo)
+  scheduledAt      DateTime?    // null = unscheduled
+  scheduledEnd     DateTime?    // derived from scheduledAt + duration
+  energyRequired   String       @default("green")  // green | yellow | red
+  domainId         String?      // for NLP-created tasks
+  recurrence       RecurrenceRule @default(none)
+  recurrenceUntil  DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project      OSProject?  @relation(fields: [projectId], references: [id])
+  activityLogs ActivityLog[]
+  calendarEvents CalendarEvent[]
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([userId, status])       // filter by status per user
+  @@index([userId, scheduledAt])  // calendar queries
+  @@map("os_tasks")
+}
+
+model EnergyProfile {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  // JSON: Record<number, "green"|"yellow"|"red"> — 0-23 hour index
+  hourMap   Json
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("energy_profiles")
+}
+
+model CalendarEvent {
+  id          String    @id @default(uuid())
+  userId      String
+  taskId      String?
+  title       String
+  description String    @default("")
+  startAt     DateTime
+  endAt       DateTime
+  allDay      Boolean   @default(false)
+  domainId    String?
+  color       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task OSTask? @relation(fields: [taskId], references: [id])
+
+  @@index([userId])
+  @@index([startAt])
+  @@map("calendar_events")
+}
+
+model ActivityLog {
+  id        String   @id @default(uuid())
+  userId    String
+  goalId    String?
+  taskId    String?
+  action    String   // "task_completed" | "goal_updated" | "drift_detected" | "task_created" | "goal_created"
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  user User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goal Goal?  @relation(fields: [goalId], references: [id])
+  task OSTask? @relation(fields: [taskId], references: [id])
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([userId, createdAt])  // range queries per user
+  @@map("activity_logs")
+}
+
+model UserSettings {
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  archetypeDensity   String   @default("balanced") // compact | balanced | spacious
+  sidebarCollapsed   Boolean  @default(false)
+  defaultCalendarView String  @default("week")     // day | week | month
+  driftSensitivity   Float    @default(0.3)        // 0-1, higher = more sensitive
+  updatedAt          DateTime @updatedAt
+  createdAt          DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_settings")
+}
+
+// ─── Wave 2: DeepSeek Daily Insights (Task 9) ─────────────────────────────────
+
+model DailyInsight {
+  id         String   @id @default(uuid())
+  userId     String
+  date       String   // YYYY-MM-DD in user's local timezone
+  content    String   @db.Text
+  model      String   @default("deepseek-chat")
+  isFallback Boolean  @default(false)
+  prompt     String?  @db.Text // stored for audit / fine-tuning
+  createdAt  DateTime @default(now())
+
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  feedback InsightFeedback?
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([date])
+  @@map("daily_insights")
+}
+
+model InsightFeedback {
+  id        String   @id @default(uuid())
+  insightId String   @unique
+  userId    String
+  rating    Int      // 1 = thumbs up | -1 = thumbs down
+  createdAt DateTime @default(now())
+
+  insight DailyInsight @relation(fields: [insightId], references: [id], onDelete: Cascade)
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("insight_feedback")
+}
+
+// ─── Relations additions to User ──────────────────────────────────────────────
+// (Prisma requires explicit back-relations — added via model extensions above)

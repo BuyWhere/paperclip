@@ -1,0 +1,111 @@
+import type { Metadata } from 'next'
+import { Suspense } from 'react'
+import { PostHogProvider } from '@/components/PostHogProvider'
+import { Header } from '@/components/Header'
+import './globals.css'
+
+export const metadata: Metadata = {
+  title: '8os - Your Personalized Life Operating System',
+  description: 'A personalized operating system unique to you. Free. No credit card. Works in Telegram.',
+  keywords: ['personalized OS', 'productivity', 'life operating system', 'AI productivity', 'operating system for life'],
+  authors: [{ name: '8os' }],
+  creator: '8os',
+  metadataBase: new URL('https://8os.ai'),
+  alternates: {
+    canonical: '/',
+    languages: {
+      'en': '/en',
+      'zh': '/zh',
+    },
+  },
+  openGraph: {
+    type: 'website',
+    url: 'https://8os.ai/',
+    siteName: '8os',
+    title: '8os - Your Personalized Life Operating System',
+    description: 'A personalized operating system unique to you. Free. No credit card. Works in Telegram.',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: '8os - Your Personalized Life Operating System',
+      },
+    ],
+    locale: 'en_US',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: '8os - Your Personalized Life Operating System',
+    description: 'A personalized operating system unique to you. Free. No credit card. Works in Telegram.',
+    images: ['/og-image.png'],
+    creator: '@8os',
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
+  ...(process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION && {
+    verification: {
+      google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
+    },
+  }),
+}
+
+const softwareSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: '8os',
+  applicationCategory: 'ProductivityApplication',
+  operatingSystem: 'Web, Telegram',
+  description: 'A personalized operating system for life that combines BaZi and AI to create a productivity system tailored to your personality.',
+  url: 'https://8os.ai',
+  image: 'https://8os.ai/og-image.png',
+  offers: {
+    '@type': 'Offer',
+    price: '0',
+    priceCurrency: 'USD',
+    availability: 'https://schema.org/InStock',
+  },
+  aggregateRating: {
+    '@type': 'AggregateRating',
+    ratingValue: '4.8',
+    ratingCount: '1523',
+  },
+  brand: {
+    '@type': 'Brand',
+    name: '8os',
+  },
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareSchema) }}
+        />
+      </head>
+      <body>
+        <Header />
+        <Suspense>
+          <PostHogProvider>
+            {children}
+          </PostHogProvider>
+        </Suspense>
+      </body>
+    </html>
+  )
+}

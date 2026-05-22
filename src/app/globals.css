@@ -1,0 +1,106 @@
+/* 8os Global Styles — dark theme */
+
+:root {
+  --color-bg-primary: #0D0D0F;
+  --color-bg-secondary: #1A1A1D;
+  --color-bg-card: rgba(255, 255, 255, 0.03);
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-strong: #1a1a1a;
+  --color-text-primary: #ededed;
+  --color-text-secondary: #888888;
+  --color-text-muted: #666666;
+  --color-accent: #667eea;
+  --color-accent-2: #764ba2;
+  --header-height: 72px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  padding-top: var(--header-height);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Sidebar nav — desktop */
+.sidebar-desktop {
+  display: block;
+}
+
+.sidebar-mobile-toggle {
+  display: none;
+}
+
+.sidebar-nav-drawer {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .sidebar-desktop {
+    display: none;
+  }
+
+  .sidebar-mobile-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    z-index: 200;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border: none;
+    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    color: #fff;
+    font-size: 1.125rem;
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+  }
+
+  .sidebar-nav-drawer {
+    position: fixed;
+    inset: 0;
+    z-index: 150;
+    background: rgba(0, 0, 0, 0.75);
+    align-items: flex-end;
+    padding: 1rem;
+  }
+
+  .sidebar-nav-drawer.open {
+    display: flex;
+  }
+
+  .sidebar-nav-inner {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+    padding: 1.25rem;
+    width: 100%;
+  }
+}
+
+/* Header mobile nav */
+.header-nav-links {
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+}
+
+@media (max-width: 640px) {
+  .header-nav-links {
+    display: none;
+  }
+}
