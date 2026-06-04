@@ -161,6 +161,13 @@ const apiRequestSchema = z.object({
   jsonBody: z.string().optional(),
 });
 
+const findBestPriceSchema = z.object({
+  query: z.string().min(1).describe("Product name or search term"),
+  market: z.enum(["SG", "US", "MY", "VN", "TH"]).optional().describe("Market/country code"),
+  currency: z.string().optional().describe("Currency code (e.g., SGD, USD)"),
+  limit: z.number().int().positive().max(100).optional().default(10).describe("Max results to return"),
+});
+
 const workspaceRuntimeControlTargetSchema = z.object({
   workspaceCommandId: z.string().min(1).optional().nullable(),
   runtimeServiceId: z.string().uuid().optional().nullable(),
@@ -603,6 +610,50 @@ export function createToolDefinitions(client: PaperclipApiClient): ToolDefinitio
         return client.requestJson(method, path, {
           body: parseOptionalJson(jsonBody),
         });
+      },
+    ),
+    makeTool(
+      "findBestPrice",
+      "Find the best price for a product across retailers in a specific market. Returns pricing comparison data for multiple retailers.",
+      findBestPriceSchema,
+      async ({ query, market, currency, limit }) => {
+        const buywhereApiKey = process.env.BUYWHERE_API_KEY;
+        if (!buywhereApiKey) {
+          throw new Error("BUYWHERE_API_KEY environment variable not set");
+        }
+
+        const response = await fetch("https://api.buywhere.ai/mcp", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${buywhereApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: `fp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+            method: "tools/call",
+            params: {
+              name: "find_best_price",
+              arguments: {
+                query,
+                market,
+                currency,
+                limit,
+              },
+            },
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`BuyWhere API error: ${response.status} ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        if (result.error) {
+          throw new Error(`BuyWhere MCP error: ${JSON.stringify(result.error)}`);
+        }
+
+        return result;
       },
     ),
   ];
