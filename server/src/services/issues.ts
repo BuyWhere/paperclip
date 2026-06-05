@@ -4886,7 +4886,12 @@ export function issueService(db: Db) {
       });
     },
 
-    release: async (id: string, actorAgentId?: string, actorRunId?: string | null) => {
+    release: async (
+      id: string,
+      actorAgentId?: string,
+      actorRunId?: string | null,
+      preserveAssignee = false,
+    ) => {
       await clearExecutionRunIfTerminal(id);
       const existing = await db
         .select()
@@ -4895,13 +4900,10 @@ export function issueService(db: Db) {
         .then((rows) => rows[0] ?? null);
 
       if (!existing) return null;
-      if (actorAgentId && existing.assigneeAgentId && existing.assigneeAgentId !== actorAgentId) {
-        throw conflict("Only assignee can release issue");
-      }
       if (
         actorAgentId &&
         existing.status === "in_progress" &&
-        existing.assigneeAgentId === actorAgentId &&
+        existing.assigneeAgentId &&
         existing.checkoutRunId &&
         !sameRunLock(existing.checkoutRunId, actorRunId ?? null)
       ) {
@@ -4916,17 +4918,21 @@ export function issueService(db: Db) {
         }
       }
 
+      const lockFields = {
+        checkoutRunId: null,
+        executionRunId: null,
+        executionAgentNameKey: null,
+        executionLockedAt: null,
+        updatedAt: new Date(),
+      } as const;
+
       const updated = await db
         .update(issues)
-        .set({
-          status: "todo",
-          assigneeAgentId: null,
-          checkoutRunId: null,
-          executionRunId: null,
-          executionAgentNameKey: null,
-          executionLockedAt: null,
-          updatedAt: new Date(),
-        })
+        .set(
+          preserveAssignee
+            ? lockFields
+            : { ...lockFields, assigneeAgentId: null },
+        )
         .where(eq(issues.id, id))
         .returning()
         .then((rows) => rows[0] ?? null);

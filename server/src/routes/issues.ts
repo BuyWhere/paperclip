@@ -4857,14 +4857,20 @@ export function issueRoutes(
     }
     assertCompanyAccess(req, existing.companyId);
     if (!(await assertAgentIssueMutationAllowed(req, res, existing))) return;
-    const actorRunId = requireAgentRunId(req, res);
-    if (req.actor.type === "agent" && !actorRunId) return;
 
-    const released = await svc.release(
-      id,
-      req.actor.type === "agent" ? req.actor.agentId : undefined,
-      actorRunId,
+    const actorRunId = req.actor.type === "agent" ? req.actor.runId?.trim() : undefined;
+    if (req.actor.type === "agent" && existing.checkoutRunId && !actorRunId) {
+      res.status(401).json({ error: "Agent run id required" });
+      return;
+    }
+
+    const actorAgentId = req.actor.type === "agent" ? req.actor.agentId : undefined;
+    const preserveAssignee = !!(
+      actorAgentId &&
+      existing.assigneeAgentId &&
+      actorAgentId !== existing.assigneeAgentId
     );
+    const released = await svc.release(id, actorAgentId, actorRunId, preserveAssignee);
     if (!released) {
       res.status(404).json({ error: "Issue not found" });
       return;
@@ -4882,7 +4888,31 @@ export function issueRoutes(
       entityId: released.id,
     });
 
-    res.json(released);
+    if (preserveAssignee) {
+      await logActivity(db, {
+        companyId: released.companyId,
+        actorType: actor.actorType,
+        actorId: actor.actorId,
+        agentId: actor.agentId,
+        runId: actor.runId,
+        action: "issue.released_chain",
+        entityType: "issue",
+        entityId: released.id,
+        details: {
+          preservedAssigneeAgentId: existing.assigneeAgentId,
+          preservedStatus: existing.status,
+        },
+      });
+    }
+
+    res.json({
+      ...released,
+      releasedRunId: actorRunId,
+      releasedAt: new Date().toISOString(),
+      releasedByAgentId: actorAgentId ?? null,
+      issueStatus: released.status,
+      preserveAssignee,
+    });
   });
 
   router.post("/issues/:id/admin/force-release", async (req, res) => {
