@@ -396,6 +396,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
   const hasExplicitClaudeConfigDir =
     typeof configEnv.CLAUDE_CONFIG_DIR === "string" && configEnv.CLAUDE_CONFIG_DIR.trim().length > 0;
   const instructionsFilePath = asString(config.instructionsFilePath, "").trim();
+  const configuredInstructionsFileContents = asString(config.instructionsFileContents);
   const instructionsFileDir = instructionsFilePath ? `${path.dirname(instructionsFilePath)}/` : "";
   const runtimeConfig = await buildClaudeRuntimeConfig({
     runId,
@@ -438,15 +439,19 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
   // file that includes both the file content and the path directive, so we only
   // need --append-system-prompt-file (Claude CLI forbids using both flags together).
   let combinedInstructionsContents: string | null = null;
-  if (instructionsFilePath) {
-    try {
-      const instructionsContent = await fs.readFile(instructionsFilePath, "utf-8");
-      const pathDirective =
-        `\nThe above agent instructions were loaded from ${instructionsFilePath}. ` +
+  const instructionsPathDirective =
+    instructionsFilePath.length > 0
+      ? `\nThe above agent instructions were loaded from ${instructionsFilePath}. ` +
         `Resolve any relative file references from ${instructionsFileDir}. ` +
         `This base directory is authoritative for sibling instruction files such as ` +
-        `./HEARTBEAT.md, ./SOUL.md, and ./TOOLS.md; do not resolve those from the parent agent directory.`;
-      combinedInstructionsContents = instructionsContent + pathDirective;
+        `./HEARTBEAT.md, ./SOUL.md, and ./TOOLS.md; do not resolve those from the parent agent directory.`
+      : "";
+  if (configuredInstructionsFileContents) {
+    combinedInstructionsContents = configuredInstructionsFileContents + instructionsPathDirective;
+  } else if (instructionsFilePath) {
+    try {
+      const instructionsContent = await fs.readFile(instructionsFilePath, "utf-8");
+      combinedInstructionsContents = instructionsContent + instructionsPathDirective;
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       await onLog(
@@ -731,8 +736,12 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
       );
     }
     if (attemptInstructionsFilePath && !resumeSessionId) {
+      const instructionSource = instructionsFilePath.length > 0
+        ? instructionsFilePath
+        : "inline instruction payload";
       commandNotes.push(
-        `Injected agent instructions via --append-system-prompt-file ${instructionsFilePath} (with path directive appended)`,
+        `Injected agent instructions via --append-system-prompt-file ${instructionSource}` +
+        (instructionsFilePath.length > 0 ? " (with path directive appended)" : ""),
       );
     }
     if (onMeta) {

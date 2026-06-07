@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { agentInstructionsService } from "../services/agent-instructions.js";
 
 type TestAgent = {
@@ -27,13 +27,20 @@ function makeAgent(adapterConfig: Record<string, unknown>): TestAgent {
 describe("agent instructions service", () => {
   const originalPaperclipHome = process.env.PAPERCLIP_HOME;
   const originalPaperclipInstanceId = process.env.PAPERCLIP_INSTANCE_ID;
+  const originalRuntimeUid = process.env.PAPERCLIP_RUNTIME_UID;
+  const originalRuntimeGid = process.env.PAPERCLIP_RUNTIME_GID;
   const cleanupDirs = new Set<string>();
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     if (originalPaperclipHome === undefined) delete process.env.PAPERCLIP_HOME;
     else process.env.PAPERCLIP_HOME = originalPaperclipHome;
     if (originalPaperclipInstanceId === undefined) delete process.env.PAPERCLIP_INSTANCE_ID;
     else process.env.PAPERCLIP_INSTANCE_ID = originalPaperclipInstanceId;
+    if (originalRuntimeUid === undefined) delete process.env.PAPERCLIP_RUNTIME_UID;
+    else process.env.PAPERCLIP_RUNTIME_UID = originalRuntimeUid;
+    if (originalRuntimeGid === undefined) delete process.env.PAPERCLIP_RUNTIME_GID;
+    else process.env.PAPERCLIP_RUNTIME_GID = originalRuntimeGid;
 
     await Promise.all([...cleanupDirs].map(async (dir) => {
       await fs.rm(dir, { recursive: true, force: true });
@@ -357,5 +364,45 @@ describe("agent instructions service", () => {
       "Recovered managed instructions entry file from disk as AGENTS.md; previous entry docs/MISSING.md was missing.",
     ]);
     expect(exported.files).toEqual({ "AGENTS.md": "# Managed Agent\n" });
+  });
+
+  it("repairs managed bundle ownership and owner-write permissions when writing files", async () => {
+    const paperclipHome = await makeTempDir("paperclip-agent-instructions-perms-");
+    cleanupDirs.add(paperclipHome);
+    process.env.PAPERCLIP_HOME = paperclipHome;
+    process.env.PAPERCLIP_INSTANCE_ID = "test-instance";
+    process.env.PAPERCLIP_RUNTIME_UID = "1234";
+    process.env.PAPERCLIP_RUNTIME_GID = "1234";
+
+    const managedRoot = path.join(
+      paperclipHome,
+      "instances",
+      "test-instance",
+      "companies",
+      "company-1",
+      "agents",
+      "agent-1",
+      "instructions",
+    );
+    await fs.mkdir(path.join(managedRoot, "memory", "daily"), { recursive: true });
+    await fs.writeFile(path.join(managedRoot, "AGENTS.md"), "# Managed Agent\n", "utf8");
+
+    const chownSpy = vi.spyOn(fs, "chown").mockResolvedValue(undefined);
+    const chmodSpy = vi.spyOn(fs, "chmod").mockResolvedValue(undefined);
+
+    const svc = agentInstructionsService();
+    const agent = makeAgent({
+      instructionsBundleMode: "managed",
+      instructionsRootPath: managedRoot,
+      instructionsEntryFile: "AGENTS.md",
+      instructionsFilePath: path.join(managedRoot, "AGENTS.md"),
+    });
+
+    await svc.writeFile(agent, "memory/daily/2026-05-30.md", "# Summary\n");
+
+    expect(chownSpy).toHaveBeenCalledWith(path.join(managedRoot, "memory", "daily"), 1234, 1234);
+    expect(chownSpy).toHaveBeenCalledWith(path.join(managedRoot, "memory", "daily", "2026-05-30.md"), 1234, 1234);
+    expect(chmodSpy).toHaveBeenCalledWith(path.join(managedRoot, "memory", "daily"), expect.any(Number));
+    expect(chmodSpy).toHaveBeenCalledWith(path.join(managedRoot, "memory", "daily", "2026-05-30.md"), expect.any(Number));
   });
 });

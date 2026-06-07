@@ -46,6 +46,7 @@ import {
   routineRevisions,
   routineRuns,
   routines,
+  routineTriggers,
   workspaceOperations,
 } from "@paperclipai/db";
 import { conflict, HttpError, notFound } from "../errors.js";
@@ -61,14 +62,19 @@ import type {
   UsageSummary,
 } from "../adapters/index.js";
 import { createLocalAgentJwt } from "../agent-auth-jwt.js";
-import { parseObject, asBoolean, asNumber, appendWithByteCap, MAX_EXCERPT_BYTES } from "../adapters/utils.js";
+import { parseObject, asBoolean, asNumber, asString, appendWithByteCap, MAX_EXCERPT_BYTES } from "../adapters/utils.js";
 import { costService } from "./costs.js";
 import { trackAgentFirstHeartbeat } from "@paperclipai/shared/telemetry";
 import { getTelemetryClient } from "../telemetry.js";
 import { companySkillService } from "./company-skills.js";
+import { agentInstructionsService } from "./agent-instructions.js";
 import { budgetService, type BudgetEnforcementScope } from "./budgets.js";
 import { secretService } from "./secrets.js";
-import { resolveDefaultAgentWorkspaceDir, resolveManagedProjectWorkspaceDir } from "../home-paths.js";
+import {
+  ensurePrivateDirectory,
+  resolveDefaultAgentWorkspaceDir,
+  resolveManagedProjectWorkspaceDir,
+} from "../home-paths.js";
 import {
   buildHeartbeatRunIssueComment,
   HEARTBEAT_RUN_RESULT_OUTPUT_MAX_CHARS,
@@ -170,7 +176,11 @@ import { extractSkillMentionIds, isUuidLike } from "@paperclipai/shared";
 import { environmentService } from "./environments.js";
 import { environmentRuntimeService } from "./environment-runtime.js";
 import { environmentRunOrchestrator } from "./environment-run-orchestrator.js";
-import { isUnsafeSessionWorkspaceCwd } from "./session-workspace-cwd.js";
+import {
+  isFallbackAgentWorkspaceCwd,
+  isPaperclipManagedInstancePath,
+  isUnsafeSessionWorkspaceCwd,
+} from "./session-workspace-cwd.js";
 import type { PluginWorkerManager } from "./plugin-worker-manager.js";
 
 const MAX_LIVE_LOG_CHUNK_BYTES = 8 * 1024;
@@ -1550,8 +1560,7 @@ export function resolveRuntimeSessionParamsForWorkspace(input: {
       warning: null as string | null,
     };
   }
-  const fallbackAgentHomeCwd = resolveDefaultAgentWorkspaceDir(agentId);
-  if (path.resolve(previousCwd) !== path.resolve(fallbackAgentHomeCwd)) {
+  if (!isFallbackAgentWorkspaceCwd(previousCwd, agentId)) {
     return {
       sessionParams: previousSessionParams,
       warning: null as string | null,
@@ -2469,6 +2478,7 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
   const budgets = budgetService(db, budgetHooks);
   const recovery = recoveryService(db, { enqueueWakeup });
   const productivityReviews = productivityReviewService(db, { enqueueWakeup });
+  const instructions = agentInstructionsService(db);
   let unsafeTextProjectionPromise: Promise<boolean> | null = null;
 
   async function releaseEnvironmentLeasesForRun(input: {
@@ -3641,12 +3651,7 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
       preferredProjectWorkspaceId,
     );
 
-    const workspaceHints = projectWorkspaceRows.map((workspace) => ({
-      workspaceId: workspace.id,
-      cwd: readNonEmptyString(workspace.cwd),
-      repoUrl: readNonEmptyString(workspace.repoUrl),
-      repoRef: readNonEmptyString(workspace.repoRef),
-    }));
+    const workspaceHints: ResolvedWorkspaceForRun["workspaceHints"] = [];
 
     if (projectWorkspaceRows.length > 0) {
       const preferredWorkspace = preferredProjectWorkspaceId
@@ -3662,7 +3667,21 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
       for (const workspace of projectWorkspaceRows) {
         let projectCwd = readNonEmptyString(workspace.cwd);
         let managedWorkspaceWarning: string | null = null;
-        if (!projectCwd || projectCwd === REPO_ONLY_CWD_SENTINEL) {
+        const originalProjectCwd = projectCwd;
+        const projectCwdExists = projectCwd
+          ? await fs
+              .stat(projectCwd)
+              .then((stats) => stats.isDirectory())
+              .catch(() => false)
+          : false;
+        const shouldRepairMissingCwd =
+          Boolean(readNonEmptyString(workspace.repoUrl))
+          || isPaperclipManagedInstancePath(projectCwd);
+        if (
+          !projectCwd
+          || projectCwd === REPO_ONLY_CWD_SENTINEL
+          || (!projectCwdExists && shouldRepairMissingCwd)
+        ) {
           try {
             const managedWorkspace = await ensureManagedProjectWorkspace({
               companyId: agent.companyId,
@@ -3670,20 +3689,57 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
               repoUrl: readNonEmptyString(workspace.repoUrl),
             });
             projectCwd = managedWorkspace.cwd;
-            managedWorkspaceWarning = managedWorkspace.warning;
+            const repairWarnings: string[] = [];
+            if (managedWorkspace.warning) {
+              repairWarnings.push(managedWorkspace.warning);
+            }
+            if (originalProjectCwd && !projectCwdExists) {
+              repairWarnings.push(
+                `Repaired missing project workspace path "${originalProjectCwd}" to managed workspace "${projectCwd}".`,
+              );
+            } else if (!originalProjectCwd || originalProjectCwd === REPO_ONLY_CWD_SENTINEL) {
+              repairWarnings.push(
+                `Materialized managed project workspace "${projectCwd}" for workspace "${workspace.id}".`,
+              );
+            }
+            managedWorkspaceWarning = repairWarnings.length > 0 ? repairWarnings.join(" ") : null;
+            if (!originalProjectCwd || path.resolve(projectCwd) !== path.resolve(originalProjectCwd)) {
+              await db
+                .update(projectWorkspaces)
+                .set({
+                  cwd: projectCwd,
+                  updatedAt: new Date(),
+                })
+                .where(and(
+                  eq(projectWorkspaces.id, workspace.id),
+                  eq(projectWorkspaces.companyId, agent.companyId),
+                ));
+            }
           } catch (error) {
             if (preferredWorkspace?.id === workspace.id) {
               preferredWorkspaceWarning = error instanceof Error ? error.message : String(error);
             }
+            workspaceHints.push({
+              workspaceId: workspace.id,
+              cwd: originalProjectCwd,
+              repoUrl: readNonEmptyString(workspace.repoUrl),
+              repoRef: readNonEmptyString(workspace.repoRef),
+            });
             continue;
           }
         }
+        workspaceHints.push({
+          workspaceId: workspace.id,
+          cwd: projectCwd,
+          repoUrl: readNonEmptyString(workspace.repoUrl),
+          repoRef: readNonEmptyString(workspace.repoRef),
+        });
         hasConfiguredProjectCwd = true;
-        const projectCwdExists = await fs
+        const repairedProjectCwdExists = await fs
           .stat(projectCwd)
           .then((stats) => stats.isDirectory())
           .catch(() => false);
-        if (projectCwdExists) {
+        if (repairedProjectCwdExists) {
           return {
             cwd: projectCwd,
             source: "project_primary" as const,
@@ -3725,7 +3781,7 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
       }
       return {
         cwd: fallbackCwd,
-        source: "project_primary" as const,
+        source: "agent_home" as const,
         projectId: resolvedProjectId,
         workspaceId: projectWorkspaceRows[0]?.id ?? null,
         repoUrl: projectWorkspaceRows[0]?.repoUrl ?? null,
@@ -4195,6 +4251,29 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
     );
   }
 
+  async function hasActiveRoutineContinuationPath(companyId: string, issueId: string) {
+    return db
+      .select({ id: routines.id })
+      .from(routines)
+      .innerJoin(
+        routineTriggers,
+        and(
+          eq(routineTriggers.companyId, routines.companyId),
+          eq(routineTriggers.routineId, routines.id),
+          eq(routineTriggers.enabled, true),
+        ),
+      )
+      .where(
+        and(
+          eq(routines.companyId, companyId),
+          eq(routines.parentIssueId, issueId),
+          eq(routines.status, "active"),
+        ),
+      )
+      .limit(1)
+      .then((rows) => rows[0] ?? null);
+  }
+
   async function handleSuccessfulRunHandoff(run: typeof heartbeatRuns.$inferSelect, agent: typeof agents.$inferSelect) {
     if (run.status !== "succeeded") return;
     const context = parseObject(run.contextSnapshot);
@@ -4227,6 +4306,7 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
 
     const [
       activeExecutionPath,
+      activeRoutineContinuation,
       queuedWake,
       pendingInteraction,
       pendingApproval,
@@ -4254,6 +4334,9 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
           )
           .limit(1)
           .then((rows) => rows[0] ?? null)
+        : Promise.resolve(null),
+      issue
+        ? hasActiveRoutineContinuationPath(issue.companyId, issue.id)
         : Promise.resolve(null),
       issue
         ? db
@@ -4369,7 +4452,7 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
       livenessState: run.livenessState as RunLivenessState | null,
       detectedProgressSummary,
       taskKey,
-      hasActiveExecutionPath: Boolean(activeExecutionPath),
+      hasActiveExecutionPath: Boolean(activeExecutionPath || activeRoutineContinuation),
       hasQueuedWake: Boolean(queuedWake),
       hasPendingInteractionOrApproval: Boolean(pendingInteraction || pendingApproval),
       hasExplicitBlockerPath: Boolean(explicitBlocker),
@@ -7287,6 +7370,18 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
       ...effectiveResolvedConfig,
       paperclipRuntimeSkills: runtimeSkillEntries,
     };
+    if (asString(runtimeConfig.instructionsBundleMode) === "managed") {
+      const managedEntryFile = asString(runtimeConfig.instructionsEntryFile) ?? "AGENTS.md";
+      try {
+        const managedEntry = await instructions.readFile({
+          id: agent.id,
+          companyId: agent.companyId,
+          name: agent.name,
+          adapterConfig: runtimeConfig,
+        }, managedEntryFile);
+        runtimeConfig.instructionsFileContents = managedEntry.content;
+      } catch {}
+    }
     const workspaceOperationRecorder = workspaceOperationsSvc.createRecorder({
       companyId: agent.companyId,
       heartbeatRunId: run.id,
@@ -7587,7 +7682,7 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
       realization: workspaceRealization,
       agentHome: await (async () => {
         const home = resolveDefaultAgentWorkspaceDir(agent.id);
-        await fs.mkdir(home, { recursive: true });
+        await ensurePrivateDirectory(home);
         return home;
       })(),
     };

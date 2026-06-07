@@ -1,5 +1,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { and, asc, eq } from "drizzle-orm";
+import type { Db } from "@paperclipai/db";
+import { agentInstructionFiles } from "@paperclipai/db";
 import { notFound, unprocessable } from "../errors.js";
 import { resolveHomeAwarePath, resolvePaperclipInstanceRoot } from "../home-paths.js";
 
@@ -24,6 +27,9 @@ const IGNORED_INSTRUCTIONS_DIRECTORY_NAMES = new Set([
   "node_modules",
   "venv",
 ]);
+const DEFAULT_MANAGED_RUNTIME_USER = "paperclip";
+
+type RuntimeIdentity = { uid: number; gid: number };
 
 type BundleMode = "managed" | "external";
 
@@ -75,6 +81,8 @@ type BundleState = {
   legacyPromptTemplateActive: boolean;
   legacyBootstrapPromptTemplateActive: boolean;
 };
+
+type ManagedInstructionFileRecord = typeof agentInstructionFiles.$inferSelect;
 
 function asRecord(value: unknown): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return {};
@@ -141,6 +149,37 @@ function resolveManagedInstructionsRoot(agent: AgentLike): string {
   );
 }
 
+function contentByteLength(content: string): number {
+  return Buffer.byteLength(content, "utf8");
+}
+
+function makeManagedFileSummary(
+  row: Pick<ManagedInstructionFileRecord, "relativePath" | "content">,
+  entryFile: string,
+): AgentInstructionsFileSummary {
+  const normalizedPath = normalizeRelativeFilePath(row.relativePath);
+  return {
+    path: normalizedPath,
+    size: contentByteLength(row.content),
+    language: inferLanguage(normalizedPath),
+    markdown: isMarkdown(normalizedPath),
+    isEntryFile: normalizedPath === entryFile,
+    editable: true,
+    deprecated: false,
+    virtual: false,
+  };
+}
+
+function managedRowsToContents(
+  rows: ManagedInstructionFileRecord[],
+): Record<string, string> {
+  return Object.fromEntries(rows.map((row) => [row.relativePath, row.content]));
+}
+
+function agentInstructionDbEnabled(db: Db | undefined): db is Db {
+  return Boolean(db);
+}
+
 function resolveLegacyInstructionsPath(candidatePath: string, config: Record<string, unknown>): string {
   if (path.isAbsolute(candidatePath)) return candidatePath;
   const cwd = asString(config.cwd);
@@ -154,6 +193,62 @@ function resolveLegacyInstructionsPath(candidatePath: string, config: Record<str
 
 async function statIfExists(targetPath: string) {
   return fs.stat(targetPath).catch(() => null);
+}
+
+function readNumericEnv(name: string): number | null {
+  const raw = process.env[name]?.trim();
+  if (!raw) return null;
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+}
+
+async function resolveManagedRuntimeIdentity(): Promise<RuntimeIdentity | null> {
+  const envUid = readNumericEnv("PAPERCLIP_RUNTIME_UID");
+  const envGid = readNumericEnv("PAPERCLIP_RUNTIME_GID");
+  if (envUid !== null && envGid !== null) return { uid: envUid, gid: envGid };
+
+  const runtimeUser = asString(process.env.PAPERCLIP_RUNTIME_USER) ?? DEFAULT_MANAGED_RUNTIME_USER;
+  const passwd = await fs.readFile("/etc/passwd", "utf8").catch(() => null);
+  if (!passwd) return null;
+  for (const line of passwd.split(/\r?\n/)) {
+    if (!line || line.startsWith("#")) continue;
+    const [name, , uidRaw, gidRaw] = line.split(":");
+    if (name !== runtimeUser) continue;
+    const uid = Number(uidRaw);
+    const gid = Number(gidRaw);
+    if (Number.isInteger(uid) && uid >= 0 && Number.isInteger(gid) && gid >= 0) {
+      return { uid, gid };
+    }
+  }
+  return null;
+}
+
+async function repairManagedInstructionPathWritable(targetPath: string): Promise<void> {
+  const identity = await resolveManagedRuntimeIdentity();
+  if (!identity) return;
+
+  const stack = [targetPath];
+  while (stack.length > 0) {
+    const currentPath = stack.pop();
+    if (!currentPath) continue;
+    const stat = await fs.lstat(currentPath).catch(() => null);
+    if (!stat) continue;
+    if (stat.isSymbolicLink()) continue;
+
+    const desiredMode = stat.isDirectory() ? (stat.mode | 0o700) & 0o777 : (stat.mode | 0o600) & 0o777;
+    if ((stat.mode & 0o777) !== desiredMode) {
+      await fs.chmod(currentPath, desiredMode).catch(() => undefined);
+    }
+    if (stat.uid !== identity.uid || stat.gid !== identity.gid) {
+      await fs.chown(currentPath, identity.uid, identity.gid).catch(() => undefined);
+    }
+    if (!stat.isDirectory()) continue;
+
+    const entries = await fs.readdir(currentPath, { withFileTypes: true }).catch(() => []);
+    for (const entry of entries) {
+      stack.push(path.join(currentPath, entry.name));
+    }
+  }
 }
 
 function shouldIgnoreInstructionsEntry(entry: { name: string; isDirectory(): boolean; isFile(): boolean }) {
@@ -220,6 +315,127 @@ async function readLegacyInstructions(agent: AgentLike, config: Record<string, u
     }
   }
   return asString(config[PROMPT_KEY]) ?? "";
+}
+
+async function queryManagedInstructions(db: Db, agent: AgentLike): Promise<ManagedInstructionFileRecord[]> {
+  return db
+    .select()
+    .from(agentInstructionFiles)
+    .where(
+      and(
+        eq(agentInstructionFiles.agentId, agent.id),
+        eq(agentInstructionFiles.companyId, agent.companyId),
+      ),
+    )
+    .orderBy(asc(agentInstructionFiles.relativePath))
+    .then((rows) => rows.map((row) => ({
+      ...row,
+      updatedAt: new Date(row.updatedAt ?? Date.now()),
+    })));
+}
+
+async function readManagedInstructionFileContent(
+  db: Db,
+  agent: AgentLike,
+  relativePath: string,
+): Promise<string | null> {
+  const normalizedPath = normalizeRelativeFilePath(relativePath);
+  const row = await db
+    .select({ content: agentInstructionFiles.content })
+    .from(agentInstructionFiles)
+    .where(
+      and(
+        eq(agentInstructionFiles.agentId, agent.id),
+        eq(agentInstructionFiles.companyId, agent.companyId),
+        eq(agentInstructionFiles.relativePath, normalizedPath),
+      ),
+    )
+    .then((rows) => rows[0] ?? null);
+  return row?.content ?? null;
+}
+
+async function upsertManagedInstructionFile(
+  db: Db,
+  agent: AgentLike,
+  relativePath: string,
+  content: string,
+) {
+  await db
+    .insert(agentInstructionFiles)
+    .values({
+      agentId: agent.id,
+      companyId: agent.companyId,
+      relativePath: normalizeRelativeFilePath(relativePath),
+      content,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: [agentInstructionFiles.agentId, agentInstructionFiles.relativePath],
+      set: {
+        content,
+        updatedAt: new Date(),
+      },
+    });
+}
+
+async function deleteManagedInstructionFile(db: Db, agent: AgentLike, relativePath: string) {
+  const normalizedPath = normalizeRelativeFilePath(relativePath);
+  await db.delete(agentInstructionFiles).where(
+    and(
+      eq(agentInstructionFiles.agentId, agent.id),
+      eq(agentInstructionFiles.companyId, agent.companyId),
+      eq(agentInstructionFiles.relativePath, normalizedPath),
+    ),
+  );
+}
+
+async function clearManagedInstructionFiles(db: Db, agent: AgentLike) {
+  await db
+    .delete(agentInstructionFiles)
+    .where(
+      and(
+        eq(agentInstructionFiles.agentId, agent.id),
+        eq(agentInstructionFiles.companyId, agent.companyId),
+      ),
+    );
+}
+
+async function syncManagedBundleFromFilesystem(
+  db: Db,
+  agent: AgentLike,
+  state: BundleState,
+): Promise<ManagedInstructionFileRecord[]> {
+  if (state.mode !== "managed" || !state.rootPath) return [];
+  const stat = await statIfExists(state.rootPath);
+  if (!stat?.isDirectory()) return [];
+  const relativePaths = await listFilesRecursive(state.rootPath);
+  if (relativePaths.length === 0) return [];
+  const persistedRows: ManagedInstructionFileRecord[] = [];
+  for (const relativePath of relativePaths) {
+    const absolutePath = resolvePathWithinRoot(state.rootPath, relativePath);
+    const content = await fs.readFile(absolutePath, "utf8").catch(() => null);
+    if (content === null) continue;
+    await upsertManagedInstructionFile(db, agent, relativePath, content);
+    persistedRows.push({
+      agentId: agent.id,
+      companyId: agent.companyId,
+      relativePath,
+      content,
+      updatedAt: new Date(),
+    });
+  }
+  return persistedRows;
+}
+
+async function readManagedBundleFiles(
+  db: Db | undefined,
+  agent: AgentLike,
+  state: BundleState,
+): Promise<ManagedInstructionFileRecord[]> {
+  if (!agentInstructionDbEnabled(db)) return [];
+  const persistedRows = await queryManagedInstructions(db, agent);
+  if (persistedRows.length > 0) return persistedRows;
+  return syncManagedBundleFromFilesystem(db, agent, state);
 }
 
 function deriveBundleState(agent: AgentLike): BundleState {
@@ -417,15 +633,24 @@ function buildPersistedBundleConfig(
 async function writeBundleFiles(
   rootPath: string,
   files: Record<string, string>,
-  options?: { overwriteExisting?: boolean },
+  options?: { overwriteExisting?: boolean; repairWritable?: boolean },
 ) {
+  if (options?.repairWritable) {
+    await repairManagedInstructionPathWritable(rootPath);
+  }
   for (const [relativePath, content] of Object.entries(files)) {
     const normalizedPath = normalizeRelativeFilePath(relativePath);
     const absolutePath = resolvePathWithinRoot(rootPath, normalizedPath);
     const existingStat = await statIfExists(absolutePath);
     if (existingStat?.isFile() && !options?.overwriteExisting) continue;
     await fs.mkdir(path.dirname(absolutePath), { recursive: true });
+    if (options?.repairWritable) {
+      await repairManagedInstructionPathWritable(path.dirname(absolutePath));
+    }
     await fs.writeFile(absolutePath, content, "utf8");
+    if (options?.repairWritable) {
+      await repairManagedInstructionPathWritable(absolutePath);
+    }
   }
 }
 
@@ -451,9 +676,15 @@ export function syncInstructionsBundleConfigFromFilePath(
   return applyBundleConfig(next, { mode, rootPath, entryFile });
 }
 
-export function agentInstructionsService() {
+export function agentInstructionsService(db?: Db) {
   async function getBundle(agent: AgentLike): Promise<AgentInstructionsBundle> {
     const state = await recoverManagedBundleState(agent, deriveBundleState(agent));
+    if (state.mode === "managed" && db) {
+      const managedRows = await readManagedBundleFiles(db, agent, state);
+      if (managedRows.length > 0) {
+        return toBundle(agent, state, managedRows.map((row) => makeManagedFileSummary(row, state.entryFile)));
+      }
+    }
     if (!state.rootPath) return toBundle(agent, state, []);
     const stat = await statIfExists(state.rootPath);
     if (!stat?.isDirectory()) {
@@ -484,14 +715,33 @@ export function agentInstructionsService() {
         content,
       };
     }
+    const normalizedPath = normalizeRelativeFilePath(relativePath);
+    if (state.mode === "managed" && db) {
+      const dbContent = await readManagedInstructionFileContent(db, agent, normalizedPath).catch(() => null);
+      if (dbContent !== null) {
+        return {
+          path: normalizedPath,
+          size: contentByteLength(dbContent),
+          language: inferLanguage(normalizedPath),
+          markdown: isMarkdown(normalizedPath),
+          isEntryFile: normalizedPath === state.entryFile,
+          editable: true,
+          deprecated: false,
+          virtual: false,
+          content: dbContent,
+        };
+      }
+    }
     if (!state.rootPath) throw notFound("Agent instructions bundle is not configured");
-    const absolutePath = resolvePathWithinRoot(state.rootPath, relativePath);
+    const absolutePath = resolvePathWithinRoot(state.rootPath, normalizedPath);
     const [content, stat] = await Promise.all([
       fs.readFile(absolutePath, "utf8").catch(() => null),
       fs.stat(absolutePath).catch(() => null),
     ]);
     if (content === null || !stat?.isFile()) throw notFound("Instructions file not found");
-    const normalizedPath = normalizeRelativeFilePath(relativePath);
+    if (db && state.mode === "managed") {
+      await upsertManagedInstructionFile(db, agent, normalizedPath, content).catch(() => {});
+    }
     return {
       path: normalizedPath,
       size: stat.size,
@@ -528,6 +778,7 @@ export function agentInstructionsService() {
       clearLegacyPromptTemplate: options?.clearLegacyPromptTemplate,
     });
     await fs.mkdir(managedRoot, { recursive: true });
+    await repairManagedInstructionPathWritable(managedRoot);
 
     const entryPath = resolvePathWithinRoot(managedRoot, entryFile);
     const entryStat = await statIfExists(entryPath);
@@ -535,7 +786,12 @@ export function agentInstructionsService() {
       const legacyInstructions = await readLegacyInstructions(agent, current.config);
       if (legacyInstructions.trim().length > 0) {
         await fs.mkdir(path.dirname(entryPath), { recursive: true });
+        await repairManagedInstructionPathWritable(path.dirname(entryPath));
         await fs.writeFile(entryPath, legacyInstructions, "utf8");
+        await repairManagedInstructionPathWritable(entryPath);
+        if (db) {
+          await upsertManagedInstructionFile(db, agent, entryFile, legacyInstructions).catch(() => {});
+        }
       }
     }
 
@@ -574,16 +830,19 @@ export function agentInstructionsService() {
     }
 
     await fs.mkdir(nextRootPath, { recursive: true });
+    if (nextMode === "managed") {
+      await repairManagedInstructionPathWritable(nextRootPath);
+    }
 
     const existingFiles = await listFilesRecursive(nextRootPath);
     const exported = await exportFiles(agent);
     if (existingFiles.length === 0) {
-      await writeBundleFiles(nextRootPath, exported.files);
+      await writeBundleFiles(nextRootPath, exported.files, { repairWritable: nextMode === "managed" });
     }
     const refreshedFiles = existingFiles.length === 0 ? await listFilesRecursive(nextRootPath) : existingFiles;
     if (!refreshedFiles.includes(nextEntryFile)) {
       const nextEntryContent = exported.files[nextEntryFile] ?? exported.files[exported.entryFile] ?? "";
-      await writeBundleFiles(nextRootPath, { [nextEntryFile]: nextEntryContent });
+      await writeBundleFiles(nextRootPath, { [nextEntryFile]: nextEntryContent }, { repairWritable: nextMode === "managed" });
     }
 
     const nextConfig = applyBundleConfig(state.config, {
@@ -623,7 +882,16 @@ export function agentInstructionsService() {
     const prepared = await ensureWritableBundle(agent, options);
     const absolutePath = resolvePathWithinRoot(prepared.state.rootPath!, relativePath);
     await fs.mkdir(path.dirname(absolutePath), { recursive: true });
+    if (prepared.state.mode === "managed") {
+      await repairManagedInstructionPathWritable(path.dirname(absolutePath));
+    }
     await fs.writeFile(absolutePath, content, "utf8");
+    if (prepared.state.mode === "managed") {
+      await repairManagedInstructionPathWritable(absolutePath);
+    }
+    if (db && prepared.state.mode === "managed") {
+      await upsertManagedInstructionFile(db, { ...agent, adapterConfig: prepared.adapterConfig }, relativePath, content);
+    }
     const nextAgent = { ...agent, adapterConfig: prepared.adapterConfig };
     const [bundle, file] = await Promise.all([
       getBundle(nextAgent),
@@ -646,6 +914,9 @@ export function agentInstructionsService() {
     if (normalizedPath === state.entryFile) {
       throw unprocessable("Cannot delete the bundle entry file");
     }
+    if (db && state.mode === "managed") {
+      await deleteManagedInstructionFile(db, agent, normalizedPath);
+    }
     const absolutePath = resolvePathWithinRoot(state.rootPath, normalizedPath);
     await fs.rm(absolutePath, { force: true });
     const adapterConfig = buildPersistedBundleConfig(derived, state);
@@ -659,6 +930,14 @@ export function agentInstructionsService() {
     warnings: string[];
   }> {
     const state = await recoverManagedBundleState(agent, deriveBundleState(agent));
+    const managedRows = await readManagedBundleFiles(db, agent, state);
+    if (state.mode === "managed" && managedRows.length > 0) {
+      return {
+        files: managedRowsToContents(managedRows),
+        entryFile: state.entryFile,
+        warnings: state.warnings,
+      };
+    }
     if (state.rootPath) {
       const stat = await statIfExists(state.rootPath);
       if (stat?.isDirectory()) {
@@ -696,8 +975,12 @@ export function agentInstructionsService() {
 
     if (options?.replaceExisting) {
       await fs.rm(rootPath, { recursive: true, force: true });
+      if (db) {
+        await clearManagedInstructionFiles(db, agent);
+      }
     }
     await fs.mkdir(rootPath, { recursive: true });
+    await repairManagedInstructionPathWritable(rootPath);
 
     const normalizedEntries = Object.entries(files).map(([relativePath, content]) => [
       normalizeRelativeFilePath(relativePath),
@@ -706,10 +989,20 @@ export function agentInstructionsService() {
     for (const [relativePath, content] of normalizedEntries) {
       const absolutePath = resolvePathWithinRoot(rootPath, relativePath);
       await fs.mkdir(path.dirname(absolutePath), { recursive: true });
+      await repairManagedInstructionPathWritable(path.dirname(absolutePath));
       await fs.writeFile(absolutePath, content, "utf8");
+      await repairManagedInstructionPathWritable(absolutePath);
+      if (db) {
+        await upsertManagedInstructionFile(db, agent, relativePath, content);
+      }
     }
     if (!normalizedEntries.some(([relativePath]) => relativePath === entryFile)) {
-      await fs.writeFile(resolvePathWithinRoot(rootPath, entryFile), "", "utf8");
+      const entryPath = resolvePathWithinRoot(rootPath, entryFile);
+      await fs.writeFile(entryPath, "", "utf8");
+      await repairManagedInstructionPathWritable(entryPath);
+      if (db) {
+        await upsertManagedInstructionFile(db, agent, entryFile, "");
+      }
     }
 
     const adapterConfig = applyBundleConfig(asRecord(agent.adapterConfig), {
