@@ -116,6 +116,17 @@ function readLiveRunsQueryInt(value: unknown, max: number, fallback = 0) {
   return Math.min(max, Math.trunc(parsed));
 }
 
+function parseIncludeMonthlySpendQuery(value: unknown, fallback: boolean) {
+  if (value === undefined) return fallback;
+  if (typeof value === "boolean") return value;
+  if (typeof value !== "string") return fallback;
+
+  const normalized = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) return true;
+  if (["0", "false", "no", "off"].includes(normalized)) return false;
+  return fallback;
+}
+
 export function agentRoutes(
   db: Db,
   options: { pluginWorkerManager?: PluginWorkerManager } = {},
@@ -174,7 +185,7 @@ export function agentRoutes(
   const recovery = recoveryService(db, { enqueueWakeup: heartbeat.wakeup });
   const issueApprovalsSvc = issueApprovalService(db);
   const secretsSvc = secretService(db);
-  const instructions = agentInstructionsService();
+  const instructions = agentInstructionsService(db);
   const companySkills = companySkillService(db);
   const workspaceOperations = workspaceOperationService(db);
   const instanceSettings = instanceSettingsService(db);
@@ -1599,14 +1610,23 @@ export function agentRoutes(
   router.get("/companies/:companyId/agents", async (req, res) => {
     const companyId = req.params.companyId as string;
     assertCompanyAccess(req, companyId);
-    const unsupportedQueryParams = Object.keys(req.query).sort();
+
+    const includeMonthlySpend = parseIncludeMonthlySpendQuery(
+      req.query.include_monthly_spend,
+      false,
+    );
+    const unsupportedQueryParams = Object.keys(req.query)
+      .filter((key) => key !== "include_monthly_spend")
+      .sort();
+
     if (unsupportedQueryParams.length > 0) {
       res.status(400).json({
         error: `Unsupported query parameter${unsupportedQueryParams.length === 1 ? "" : "s"}: ${unsupportedQueryParams.join(", ")}`,
       });
       return;
     }
-    const result = await svc.list(companyId);
+
+    const result = await svc.list(companyId, { includeMonthlySpend });
     const canReadConfigs = await actorCanReadConfigurationsForCompany(req, companyId);
     if (canReadConfigs) {
       res.json(result);
@@ -2609,10 +2629,19 @@ export function agentRoutes(
       if (requestedAdapterConfig && !changingAdapterType && !replaceAdapterConfig) {
         rawEffectiveAdapterConfig = { ...existingAdapterConfig, ...requestedAdapterConfig };
       }
-      if (changingAdapterType) {
-        // Preserve adapter-agnostic keys (env, cwd, etc.) from the existing config
-        // when the adapter type changes. Without this, a PATCH that includes
-        // adapterConfig but omits these keys would silently drop them.
+      // Preserve adapter-agnostic keys (env, cwd, etc.) from the existing config
+      // when the patch would otherwise drop them. Two paths can drop these keys:
+      //   1. changingAdapterType — switching adapters while passing only the new
+      //      adapter's keys would silently wipe env/cwd/etc.
+      //   2. replaceAdapterConfig=true — the request only carries a subset and
+      //      the server replaces the JSONB column wholesale, wiping any key
+      //      (especially env) that the client didn't re-send. This was the
+      //      primary wipe vector flagged in BUY-33656.
+      // Only preserve a key when the request leaves it undefined; an explicit
+      // empty object/null/etc. is honored.
+      const shouldPreserveAgnosticKeys =
+        changingAdapterType || (replaceAdapterConfig && !!requestedAdapterConfig);
+      if (shouldPreserveAgnosticKeys) {
         const ADAPTER_AGNOSTIC_KEYS = [
           "env", "cwd", "timeoutSec", "graceSec",
           "promptTemplate", "bootstrapPromptTemplate",
@@ -2622,10 +2651,12 @@ export function agentRoutes(
             rawEffectiveAdapterConfig = { ...rawEffectiveAdapterConfig, [key]: existingAdapterConfig[key] };
           }
         }
-        rawEffectiveAdapterConfig = preserveInstructionsBundleConfig(
-          existingAdapterConfig,
-          rawEffectiveAdapterConfig,
-        );
+        if (changingAdapterType) {
+          rawEffectiveAdapterConfig = preserveInstructionsBundleConfig(
+            existingAdapterConfig,
+            rawEffectiveAdapterConfig,
+          );
+        }
       }
       const effectiveAdapterConfig = applyCreateDefaultsByAdapterType(
         requestedAdapterType,

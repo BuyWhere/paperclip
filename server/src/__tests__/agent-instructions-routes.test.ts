@@ -397,4 +397,71 @@ describe("agent instructions bundle routes", () => {
     expect(res.body.adapterConfig.instructionsEntryFile).toBeUndefined();
     expect(res.body.adapterConfig.instructionsFilePath).toBeUndefined();
   });
+
+  it("preserves env across replaceAdapterConfig=true (BUY-33790)", async () => {
+    mockAgentService.getById.mockResolvedValue({
+      ...makeAgent(),
+      adapterType: "codex_local",
+      adapterConfig: {
+        env: { SCRAPERAPI_KEY: "secret-value", OTHER: "keep-me" },
+        cwd: "/var/work",
+        model: "gpt-5.4",
+      },
+    });
+
+    const res = await requestApp(await createApp(), (baseUrl) => request(baseUrl)
+      .patch("/api/agents/11111111-1111-4111-8111-111111111111?companyId=company-1")
+      .send({
+        replaceAdapterConfig: true,
+        adapterConfig: {
+          command: "codex --profile engineer",
+        },
+      }));
+
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body.adapterConfig).toMatchObject({
+      command: "codex --profile engineer",
+      env: { SCRAPERAPI_KEY: "secret-value", OTHER: "keep-me" },
+      cwd: "/var/work",
+    });
+    expect(mockAgentService.update).toHaveBeenCalledWith(
+      "11111111-1111-4111-8111-111111111111",
+      expect.objectContaining({
+        adapterConfig: expect.objectContaining({
+          env: { SCRAPERAPI_KEY: "secret-value", OTHER: "keep-me" },
+          cwd: "/var/work",
+        }),
+      }),
+      expect.any(Object),
+    );
+  });
+
+  it("honors explicit empty env in replaceAdapterConfig=true (BUY-33790)", async () => {
+    mockAgentService.getById.mockResolvedValue({
+      ...makeAgent(),
+      adapterType: "codex_local",
+      adapterConfig: {
+        env: { SCRAPERAPI_KEY: "secret-value" },
+        model: "gpt-5.4",
+      },
+    });
+
+    const res = await requestApp(await createApp(), (baseUrl) => request(baseUrl)
+      .patch("/api/agents/11111111-1111-4111-8111-111111111111?companyId=company-1")
+      .send({
+        replaceAdapterConfig: true,
+        adapterConfig: {
+          command: "codex --profile engineer",
+          env: {},
+        },
+      }));
+
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    // Explicit empty object is honored: the server should NOT silently fill it
+    // back in from the existing config.
+    expect(res.body.adapterConfig).toMatchObject({
+      command: "codex --profile engineer",
+      env: {},
+    });
+  });
 });
