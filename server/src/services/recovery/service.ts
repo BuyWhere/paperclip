@@ -1989,6 +1989,29 @@ export function recoveryService(db: Db, deps: { enqueueWakeup: RecoveryWakeup })
     successfulRunHandoffEvidence?: SuccessfulRunHandoffRecoveryEvidence | null;
   }) {
     const recoveryCause = input.recoveryCause ?? "stranded_assigned_issue";
+    if (
+      recoveryCause === SUCCESSFUL_RUN_MISSING_STATE_REASON &&
+      input.issue.exemptFromSuccessfulRunRecovery
+    ) {
+      await logActivity(db, {
+        companyId: input.issue.companyId,
+        actorType: "system",
+        actorId: "system",
+        agentId: null,
+        runId: input.latestRun?.id ?? null,
+        action: "issue.successful_run_handoff_skipped_exempt",
+        entityType: "issue",
+        entityId: input.issue.id,
+        details: {
+          identifier: input.issue.identifier,
+          source: "recovery.ensure_source_scoped_stranded_recovery_action",
+          recoveryCause,
+          exemptFromSuccessfulRunRecovery: true,
+          latestRunId: input.latestRun?.id ?? null,
+        },
+      });
+      return null;
+    }
     const ownerAgentId = await resolveStrandedIssueRecoveryOwnerAgentId(input.issue);
     const now = new Date();
     const action = await recoveryActionsSvc.upsertSourceScoped({
@@ -2199,6 +2222,11 @@ export function recoveryService(db: Db, deps: { enqueueWakeup: RecoveryWakeup })
       recoveryCause,
       successfulRunHandoffEvidence: input.successfulRunHandoffEvidence,
     });
+    if (!recoveryAction) {
+      // Standing-parent exemption: recovery is suppressed for this issue and
+      // cause, so the caller must not block the source issue or enqueue a wake.
+      return null;
+    }
     const blockerIds = await existingUnresolvedBlockerIssueIds(input.issue.companyId, input.issue.id);
     const updated = await issuesSvc.update(input.issue.id, {
       status: "blocked",
