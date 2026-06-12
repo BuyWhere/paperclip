@@ -1732,6 +1732,73 @@ describeEmbeddedPostgres("heartbeat orphaned process recovery", () => {
     });
   });
 
+  it("skips source-scoped recovery and keeps standing-parent in_progress when exemptFromSuccessfulRunRecovery is set", async () => {
+    const { companyId, agentId, runId, issueId } = await seedStrandedIssueFixture({
+      status: "in_progress",
+      runStatus: "succeeded",
+      livenessState: "advanced",
+    });
+    const sourceRunId = randomUUID();
+    await db
+      .update(heartbeatRuns)
+      .set({
+        contextSnapshot: {
+          issueId,
+          taskId: issueId,
+          wakeReason: "finish_successful_run_handoff",
+          sourceRunId,
+          resumeFromRunId: sourceRunId,
+          handoffRequired: true,
+          handoffReason: "successful_run_missing_state",
+          missingDisposition: "clear_next_step",
+          handoffAttempt: 1,
+          maxHandoffAttempts: 1,
+        },
+      })
+      .where(eq(heartbeatRuns.id, runId));
+    // BUY-24560-style standing parent: flag set so the source-scoped
+    // missing-disposition escalation must be suppressed, and the source
+    // issue must remain at its previous status (not flipped to blocked).
+    await db
+      .update(issues)
+      .set({ exemptFromSuccessfulRunRecovery: true })
+      .where(eq(issues.id, issueId));
+    const heartbeat = heartbeatService(db);
+
+    const result = await heartbeat.reconcileStrandedAssignedIssues();
+    expect(result.successfulRunHandoffEscalated).toBe(0);
+    expect(result.escalated).toBe(0);
+    expect(result.continuationRequeued).toBe(0);
+
+    const actionRows = await db
+      .select()
+      .from(issueRecoveryActions)
+      .where(eq(issueRecoveryActions.sourceIssueId, issueId));
+    expect(actionRows).toHaveLength(0);
+
+    const sourceIssue = await db.select().from(issues).where(eq(issues.id, issueId)).then((rows) => rows[0] ?? null);
+    expect(sourceIssue?.status).toBe("in_progress");
+    expect(sourceIssue?.exemptFromSuccessfulRunRecovery).toBe(true);
+
+    const skipActivity = await db
+      .select()
+      .from(activityLog)
+      .where(eq(activityLog.entityId, issueId));
+    expect(
+      skipActivity.some((event) => event.action === "issue.successful_run_handoff_skipped_exempt"),
+    ).toBe(true);
+    const skipEntry = skipActivity.find(
+      (event) => event.action === "issue.successful_run_handoff_skipped_exempt",
+    );
+    expect(skipEntry?.details).toMatchObject({
+      identifier: sourceIssue?.identifier,
+      exemptFromSuccessfulRunRecovery: true,
+      recoveryCause: SUCCESSFUL_RUN_MISSING_STATE_REASON,
+    });
+    void agentId;
+    void companyId;
+  });
+
   it("clears the detached warning when the run reports activity again", async () => {
     const { runId } = await seedRunFixture({
       includeIssue: false,
