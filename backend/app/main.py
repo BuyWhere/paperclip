@@ -126,6 +126,12 @@ async def lifespan(app: FastAPI):
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # OS-1096: additive migration — add archetype column to waitlist_entries
+        # if it doesn't already exist (idempotent). Backfills NULL for existing rows.
+        await conn.execute(text(
+            "ALTER TABLE waitlist_entries "
+            "ADD COLUMN IF NOT EXISTS archetype VARCHAR(64) NULL"
+        ))
 
     logger.info(json.dumps({
         "event": "startup",
@@ -326,7 +332,7 @@ async def join_waitlist(
     payload: WaitlistJoinRequest,
     db: AsyncSession = Depends(get_db_session),
 ) -> WaitlistJoinResponse:
-    entry, position = await add_waitlist_entry(db, payload.email, payload.source)
+    entry, position = await add_waitlist_entry(db, payload.email, payload.source, payload.archetype)
     total = await get_waitlist_count(db)
     return WaitlistJoinResponse(
         success=True,
@@ -349,6 +355,7 @@ async def get_waitlist_stats(
                 id=str(e.id),
                 email=e.email,
                 source=e.source,
+                archetype=e.archetype,
                 early_access_sent=e.early_access_sent,
                 created_at=e.created_at,
             )

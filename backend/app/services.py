@@ -93,10 +93,13 @@ _ALLOWED_SOURCES = {"dashboard", "telegram", "api"}
 
 
 async def add_waitlist_entry(
-    session: AsyncSession, email: str, source: str
+    session: AsyncSession, email: str, source: str, archetype: str | None = None
 ) -> tuple["WaitlistEntry", int]:
     source = source if source in _ALLOWED_SOURCES else "dashboard"
-    entry = WaitlistEntry(email=email.lower()[:254], source=source)
+    # Normalize archetype: trim, lowercase, cap length. None if empty.
+    if archetype is not None:
+        archetype = archetype.strip().lower()[:64] or None
+    entry = WaitlistEntry(email=email.lower()[:254], source=source, archetype=archetype)
     session.add(entry)
     await session.commit()
     await session.refresh(entry)

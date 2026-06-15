@@ -29,6 +29,7 @@ class WaitlistEntry(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid_str)
     email: Mapped[str] = mapped_column(String(254), unique=True, index=True)
     source: Mapped[str] = mapped_column(String(64), default="dashboard")
+    archetype: Mapped[str | None] = mapped_column(String(64), nullable=True)
     early_access_sent: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

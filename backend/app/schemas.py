@@ -53,6 +53,7 @@ class AppleExchangeResponse(BaseModel):
 class WaitlistJoinRequest(BaseModel):
     email: EmailStr
     source: str = "dashboard"
+    archetype: str | None = None
 
 
 class WaitlistJoinResponse(BaseModel):
@@ -68,6 +69,7 @@ class WaitlistEntryResponse(BaseModel):
     id: str
     email: str
     source: str
+    archetype: str | None = None
     early_access_sent: bool
     created_at: datetime
 
