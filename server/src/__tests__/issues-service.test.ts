@@ -2260,6 +2260,145 @@ describeEmbeddedPostgres("issueService.create workspace inheritance", () => {
   });
 });
 
+// Regression coverage for OS-1062: the runtime at services/heartbeat.ts
+// refuses to launch with `projectWorkspaceId` set but `projectId` null
+// (the `missing_project_id` gate). Both create and update must back-fill
+// `projectId` from `projectWorkspaceId` when the caller supplies only the
+// workspace, so the row never reaches the runtime in a broken state.
+describeEmbeddedPostgres("issueService project/workspace back-fill (OS-1062)", () => {
+  let db!: ReturnType<typeof createDb>;
+  let svc!: ReturnType<typeof issueService>;
+  let tempDb: Awaited<ReturnType<typeof startEmbeddedPostgresTestDatabase>> | null = null;
+
+  beforeAll(async () => {
+    tempDb = await startEmbeddedPostgresTestDatabase("paperclip-issues-os1062-");
+    db = createDb(tempDb.connectionString);
+    svc = issueService(db);
+    await ensureIssueRelationsTable(db);
+  }, 20_000);
+
+  afterEach(async () => {
+    await db.delete(issueComments);
+    await db.delete(issueRelations);
+    await db.delete(issueInboxArchives);
+    await db.delete(activityLog);
+    await db.delete(issues);
+    await db.delete(executionWorkspaces);
+    await db.delete(projectWorkspaces);
+    await db.delete(projects);
+    await db.delete(goals);
+    await db.delete(agents);
+    await db.delete(instanceSettings);
+    await db.delete(companies);
+  });
+
+  afterAll(async () => {
+    await tempDb?.cleanup();
+  });
+
+  async function seedCompanyAndProjectWorkspace() {
+    const companyId = randomUUID();
+    const projectId = randomUUID();
+    const projectWorkspaceId = randomUUID();
+    await db.insert(companies).values({
+      id: companyId,
+      name: "Paperclip",
+      issuePrefix: `T${companyId.replace(/-/g, "").slice(0, 6).toUpperCase()}`,
+      requireBoardApprovalForNewAgents: false,
+    });
+    await db.insert(projects).values({
+      id: projectId,
+      companyId,
+      name: "OS-1062 project",
+      status: "in_progress",
+    });
+    await db.insert(projectWorkspaces).values({
+      id: projectWorkspaceId,
+      companyId,
+      projectId,
+      name: "OS-1062 workspace",
+      sourceType: "local_path",
+      visibility: "default",
+      isPrimary: false,
+    });
+    return { companyId, projectId, projectWorkspaceId };
+  }
+
+  it("back-fills projectId from projectWorkspaceId on create", async () => {
+    const { companyId, projectWorkspaceId } = await seedCompanyAndProjectWorkspace();
+
+    const created = await svc.create(companyId, {
+      title: "Issue with workspace but no project",
+      description: "Caller PATCHed workspace but no project — must be back-filled.",
+      status: "todo",
+      priority: "medium",
+      projectWorkspaceId,
+    });
+
+    expect(created.projectId).toBeTruthy();
+    expect(created.projectWorkspaceId).toBe(projectWorkspaceId);
+    // The projectId should be the one that owns the workspace, not null.
+    const [workspace] = await db
+      .select({ projectId: projectWorkspaces.projectId })
+      .from(projectWorkspaces)
+      .where(eq(projectWorkspaces.id, projectWorkspaceId));
+    expect(created.projectId).toBe(workspace.projectId);
+  });
+
+  it("back-fills projectId from projectWorkspaceId on update", async () => {
+    const { companyId, projectId, projectWorkspaceId } = await seedCompanyAndProjectWorkspace();
+
+    // Create the issue in a valid state with both fields set.
+    const created = await svc.create(companyId, {
+      title: "Issue with both fields",
+      description: "Starting state.",
+      status: "todo",
+      priority: "medium",
+      projectId,
+      projectWorkspaceId,
+    });
+    expect(created.projectId).toBe(projectId);
+
+    // PATCH only the workspace (different workspace, same project), not
+    // the project — the update must back-fill projectId rather than
+    // leaving it null.
+    const otherWorkspaceId = randomUUID();
+    await db.insert(projectWorkspaces).values({
+      id: otherWorkspaceId,
+      companyId,
+      projectId,
+      name: "OS-1062 workspace 2",
+      sourceType: "local_path",
+      visibility: "default",
+      isPrimary: false,
+    });
+
+    const updated = await svc.update(created.id, {
+      projectWorkspaceId: otherWorkspaceId,
+    });
+
+    expect(updated).toBeTruthy();
+    expect(updated!.projectId).toBe(projectId);
+    expect(updated!.projectWorkspaceId).toBe(otherWorkspaceId);
+  });
+
+  it("preserves caller-supplied projectId when workspace project matches", async () => {
+    const { companyId, projectId, projectWorkspaceId } = await seedCompanyAndProjectWorkspace();
+
+    const created = await svc.create(companyId, {
+      title: "Caller knows both fields",
+      description: "Caller supplied both — neither should be overridden.",
+      status: "todo",
+      priority: "medium",
+      projectId,
+      projectWorkspaceId,
+    });
+
+    expect(created.projectId).toBe(projectId);
+    expect(created.projectWorkspaceId).toBe(projectWorkspaceId);
+  });
+});
+
 describeEmbeddedPostgres("issueService blockers and dependency wake readiness", () => {
   let db!: ReturnType<typeof createDb>;
   let svc!: ReturnType<typeof issueService>;

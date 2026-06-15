@@ -3083,6 +3083,29 @@ export function issueService(db: Db) {
     }
   }
 
+  // Returns the projectId that owns the given project workspace, or null if
+  // the workspace does not exist. The lookup is the same single-row read
+  // assertValidProjectWorkspace performs; we expose it separately so callers
+  // can back-fill `projectId` from a `projectWorkspaceId` they received in
+  // the API request. This is the write-time counterpart of the runtime
+  // invariant at services/heartbeat.ts that refuses to launch with
+  // `projectWorkspaceId` set but `projectId` null (the
+  // `missing_project_id` gate). Without this back-fill, callers that PATCH
+  // an issue with a workspace ID but no project ID create a row that the
+  // runtime then rejects on the next launch — a 30-minute error cycle per
+  // incident (see OS-1062).
+  async function resolveProjectIdForProjectWorkspace(
+    projectWorkspaceId: string,
+    dbOrTx: DbReader = db,
+  ): Promise<string | null> {
+    const workspace = await dbOrTx
+      .select({ projectId: projectWorkspaces.projectId })
+      .from(projectWorkspaces)
+      .where(eq(projectWorkspaces.id, projectWorkspaceId))
+      .then((rows) => rows[0] ?? null);
+    return workspace?.projectId ?? null;
+  }
+
   async function assertValidExecutionWorkspace(
     companyId: string,
     projectId: string | null | undefined,
@@ -4208,6 +4231,22 @@ export function issueService(db: Db) {
               .then((rows) => rows[0]?.id ?? null);
           }
         }
+        // Back-fill `projectId` from `projectWorkspaceId` when the caller
+        // supplied a workspace but no project. The runtime at
+        // services/heartbeat.ts refuses to launch with `projectWorkspaceId`
+        // set but `projectId` null (the `missing_project_id` gate). Without
+        // this back-fill, API callers that PATCH an issue with just a
+        // workspace ID create a row the runtime then rejects on the next
+        // launch — a 30-minute error cycle per incident (see OS-1062).
+        if (projectWorkspaceId && !issueData.projectId) {
+          const resolvedProjectId = await resolveProjectIdForProjectWorkspace(
+            projectWorkspaceId,
+            tx,
+          );
+          if (resolvedProjectId) {
+            issueData.projectId = resolvedProjectId;
+          }
+        }
         if (projectWorkspaceId) {
           await assertValidProjectWorkspace(companyId, issueData.projectId, projectWorkspaceId, tx);
         }
@@ -4374,6 +4413,23 @@ export function issueService(db: Db) {
         issueData.executionWorkspaceSettings !== undefined
           ? parseIssueExecutionWorkspaceSettings(issueData.executionWorkspaceSettings)
           : parseIssueExecutionWorkspaceSettings(existing.executionWorkspaceSettings);
+      // Back-fill `nextProjectId` from `nextProjectWorkspaceId` when the
+      // caller PATCHed a workspace but did not PATCH a project. The runtime
+      // at services/heartbeat.ts refuses to launch with
+      // `projectWorkspaceId` set but `projectId` null (the
+      // `missing_project_id` gate). Without this back-fill, the issue row
+      // gets written with a broken invariant that the runtime then rejects
+      // on the next launch — a 30-minute error cycle per incident (see
+      // OS-1062).
+      if (nextProjectWorkspaceId && !nextProjectId) {
+        const resolvedProjectId = await resolveProjectIdForProjectWorkspace(
+          nextProjectWorkspaceId,
+          dbOrTx,
+        );
+        if (resolvedProjectId && issueData.projectId === undefined) {
+          issueData.projectId = resolvedProjectId;
+        }
+      }
       if (nextProjectWorkspaceId) {
         await assertValidProjectWorkspace(existing.companyId, nextProjectId, nextProjectWorkspaceId);
       }
