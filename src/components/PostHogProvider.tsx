@@ -3,21 +3,24 @@
 import posthog from 'posthog-js'
 import { PostHogProvider as PHProvider } from 'posthog-js/react'
 import { useEffect } from 'react'
-import { usePathname, useSearchParams } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 
 function PostHogPageView() {
   const pathname = usePathname()
-  const searchParams = useSearchParams()
 
   useEffect(() => {
     if (pathname) {
-      let url = window.origin + pathname
-      if (searchParams.toString()) {
-        url = url + `?${searchParams.toString()}`
-      }
+      // Note: we capture only the pathname here, not the search params.
+      // Including useSearchParams() here forced a Suspense boundary at the
+      // layout level which bailed out server-rendering the entire page
+      // content (see OS-1056). The trade-off: query string changes without
+      // a pathname change are no longer tracked as separate pageviews.
+      // Acceptable for the launch — most of the site uses Link navigation
+      // which changes the pathname.
+      const url = typeof window !== 'undefined' ? window.origin + pathname : pathname
       posthog.capture('$pageview', { $current_url: url })
     }
-  }, [pathname, searchParams])
+  }, [pathname])
 
   return null
 }

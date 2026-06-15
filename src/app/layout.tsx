@@ -105,11 +105,9 @@ export default function RootLayout({
         </a>
         <Header />
         <div id="main-content" tabIndex={-1}>
-          <Suspense>
-            <PostHogProvider>
-              {children}
-            </PostHogProvider>
-          </Suspense>
+          <PostHogProvider>
+            {children}
+          </PostHogProvider>
         </div>
         <Footer />
       </body>
