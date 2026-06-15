@@ -47,3 +47,10 @@ yarn-error.log*
 .tsbuildinfo
 *.tsbuildinfo
 tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Test
+.pytest_cache/

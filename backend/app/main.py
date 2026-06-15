@@ -60,6 +60,7 @@ from app.services import (
     validate_referral_code,
 )
 from app.email import send_early_access_email
+from app.routers import telegram as telegram_router
 
 
 settings = get_settings()
@@ -172,6 +173,11 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
+
+# OS-1117: Telegram bot webhook (see app/routers/telegram.py for the
+# full spec — secret-token verify, /start /help /status /archetype,
+# production onboarding prompt).
+app.include_router(telegram_router.router)
 
 
 # ---------------------------------------------------------------------------
