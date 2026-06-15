@@ -28,8 +28,19 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const { cookieValue, state } = await createGoogleOauthFlowToken(mode, next, userId)
-  const response = NextResponse.redirect(buildGoogleAuthorizationUrl(state))
-  response.cookies.set(getGoogleFlowCookieName(), cookieValue, getGoogleFlowCookieOptions())
-  return response
+  try {
+    const { cookieValue, state } = await createGoogleOauthFlowToken(mode, next, userId)
+    const response = NextResponse.redirect(buildGoogleAuthorizationUrl(state))
+    response.cookies.set(getGoogleFlowCookieName(), cookieValue, getGoogleFlowCookieOptions())
+    return response
+  } catch (err) {
+    // Defensive: AUTH_FLOW_SECRET or the three GOOGLE_* env vars are missing
+    // in the deployed environment. Surface this as a friendly redirect to /login
+    // instead of a generic 500 stack trace.
+    console.error('[api/auth/google] OAuth env vars missing or invalid:', err)
+    return NextResponse.redirect(
+      new URL(`/login?error=${encodeURIComponent('Google sign-in is temporarily unavailable')}`, req.url),
+      { status: 307 },
+    )
+  }
 }

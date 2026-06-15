@@ -63,6 +63,15 @@ export function getGoogleOauthConfig() {
   return { clientId, clientSecret, redirectUri }
 }
 
+export function isGoogleAuthConfigured(): boolean {
+  return Boolean(
+    process.env.GOOGLE_CLIENT_ID &&
+      process.env.GOOGLE_CLIENT_SECRET &&
+      process.env.GOOGLE_REDIRECT_URI &&
+      process.env.AUTH_FLOW_SECRET,
+  )
+}
+
 export function getGoogleFlowCookieName(): string {
   return FLOW_COOKIE_NAME
 }
