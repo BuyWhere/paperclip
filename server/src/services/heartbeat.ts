@@ -3,7 +3,7 @@ import path from "node:path";
 import { execFile as execFileCallback } from "node:child_process";
 import { promisify } from "node:util";
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, getTableColumns, gt, inArray, isNull, lt, lte, notInArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, gt, inArray, isNull, like, lt, lte, notInArray, or, sql } from "drizzle-orm";
 import type { Db } from "@paperclipai/db";
 import {
   AGENT_DEFAULT_MAX_CONCURRENT_RUNS,
@@ -46,6 +46,7 @@ import {
   routineRevisions,
   routineRuns,
   routines,
+  routineTriggers,
   workspaceOperations,
 } from "@paperclipai/db";
 import { conflict, HttpError, notFound } from "../errors.js";
@@ -2439,6 +2440,257 @@ export type HeartbeatEnvironmentRuntime = ReturnType<typeof environmentRuntimeSe
 export interface HeartbeatServiceOptions {
   pluginWorkerManager?: PluginWorkerManager;
   environmentRuntime?: HeartbeatEnvironmentRuntime;
+}
+
+/**
+ * Mutations on an `assignment`-sourced wake that count as an inbound signal for
+ * the activity-gated reflection cadence. A wake carrying one of these mutations
+ * (paired with `source === "assignment"`) should fire the agent's reflection
+ * routine's `api` trigger, if one exists.
+ *
+ * Other wake sources (timer / on_demand / automation / approval / tree_control
+ * / etc.) are NOT signal-bearing for reflection purposes and are skipped.
+ */
+export const REFLECTION_SIGNAL_MUTATIONS = new Set<string>([
+  "assigned",
+  "commented",
+  "status_changed",
+  "blocked",
+]);
+
+export type ReflectionSignal = "assigned" | "commented" | "status_changed" | "blocked";
+
+export interface MaybeFireReflectionRoutineInput {
+  db: Db;
+  companyId: string;
+  agentId: string;
+  signal: ReflectionSignal;
+  issueId: string | null;
+  wakeupRequestId: string;
+  /**
+   * Optional injected routine-firing function. Defaults to a dynamic import
+   * of `routineService(db).runRoutine` so the production path doesn't pay
+   * the cost when the helper is unused. Tests can inject a stub to avoid
+   * pulling the full heartbeat → routine dispatch graph into the test.
+   */
+  fireRoutine?: (input: {
+    routineId: string;
+    triggerId: string;
+    idempotencyKey: string;
+    signal: ReflectionSignal;
+    issueId: string | null;
+  }) => Promise<{ id: string } | null>;
+}
+
+export interface MaybeFireReflectionRoutineResult {
+  outcome: "fired" | "skipped_no_routine" | "skipped_no_api_trigger" | "failed";
+  routineId?: string;
+  triggerId?: string;
+  routineRunId?: string;
+  idempotencyKey?: string;
+  reason?: string;
+  error?: string;
+}
+
+/**
+ * Fire the agent's activity-gated reflection routine when a wake carries an
+ * inbound signal. The helper is fully defensive — every step is wrapped in
+ * its own try/catch and the result is logged via `logActivity`. A failure
+ * here must NEVER propagate to the caller (the wake). Use this anywhere a
+ * `source === "assignment"` wake is accepted.
+ *
+ * Idempotency: derived from the wakeupRequestId so a re-fire of the same wake
+ * coalesces at the routine layer. Stable for the lifetime of the wakeup.
+ */
+export async function maybeFireReflectionRoutine(
+  input: MaybeFireReflectionRoutineInput,
+): Promise<MaybeFireReflectionRoutineResult> {
+  const idempotencyKey = `reflection:${input.wakeupRequestId}`;
+  const logBase = {
+    signal: input.signal,
+    issueId: input.issueId,
+    wakeupRequestId: input.wakeupRequestId,
+    agentId: input.agentId,
+  };
+
+  try {
+    const routine = await input.db
+      .select({
+        id: routines.id,
+        status: routines.status,
+        title: routines.title,
+      })
+      .from(routines)
+      .where(
+        and(
+          eq(routines.companyId, input.companyId),
+          eq(routines.assigneeAgentId, input.agentId),
+          eq(routines.status, "active"),
+          like(routines.title, "Nightly reflection%"),
+        ),
+      )
+      .limit(1)
+      .then((rows) => rows[0] ?? null);
+
+    if (!routine) {
+      await logActivity(input.db, {
+        companyId: input.companyId,
+        actorType: "system",
+        actorId: "heartbeat.activity-gate",
+        action: "reflection.activity_gate_skipped",
+        entityType: "agent",
+        entityId: input.agentId,
+        details: {
+          ...logBase,
+          reason: "no_reflection_routine",
+          idempotencyKey,
+        },
+      });
+      return { outcome: "skipped_no_routine", reason: "no_reflection_routine", idempotencyKey };
+    }
+
+    const apiTrigger = await input.db
+      .select({
+        id: routineTriggers.id,
+        kind: routineTriggers.kind,
+        enabled: routineTriggers.enabled,
+      })
+      .from(routineTriggers)
+      .where(
+        and(
+          eq(routineTriggers.companyId, input.companyId),
+          eq(routineTriggers.routineId, routine.id),
+          eq(routineTriggers.kind, "api"),
+          eq(routineTriggers.enabled, true),
+        ),
+      )
+      .limit(1)
+      .then((rows) => rows[0] ?? null);
+
+    if (!apiTrigger) {
+      await logActivity(input.db, {
+        companyId: input.companyId,
+        actorType: "system",
+        actorId: "heartbeat.activity-gate",
+        action: "reflection.activity_gate_skipped",
+        entityType: "routine",
+        entityId: routine.id,
+        details: {
+          ...logBase,
+          reason: "no_enabled_api_trigger",
+          idempotencyKey,
+        },
+      });
+      return {
+        outcome: "skipped_no_api_trigger",
+        routineId: routine.id,
+        reason: "no_enabled_api_trigger",
+        idempotencyKey,
+      };
+    }
+
+    // Dynamic import to break the heartbeat <-> routines circular dependency
+    // (routines.ts already imports heartbeatService at module top).
+    const fireRoutine =
+      input.fireRoutine ??
+      (async (fireInput: {
+        routineId: string;
+        triggerId: string;
+        idempotencyKey: string;
+        signal: ReflectionSignal;
+        issueId: string | null;
+      }) => {
+        const { routineService } = await import("./routines.js");
+        const svc = routineService(input.db);
+        const run = await svc.runRoutine(
+          fireInput.routineId,
+          {
+            triggerId: fireInput.triggerId,
+            source: "api",
+            payload: { signal: fireInput.signal, issueId: fireInput.issueId },
+            idempotencyKey: fireInput.idempotencyKey,
+          },
+          { agentId: null, userId: null, runId: null },
+        );
+        return { id: run.id };
+      });
+
+    const run = await fireRoutine({
+      routineId: routine.id,
+      triggerId: apiTrigger.id,
+      idempotencyKey,
+      signal: input.signal,
+      issueId: input.issueId,
+    });
+    if (!run) {
+      return {
+        outcome: "skipped_no_api_trigger",
+        routineId: routine.id,
+        reason: "fire_routine_returned_null",
+        idempotencyKey,
+      };
+    }
+
+    await logActivity(input.db, {
+      companyId: input.companyId,
+      actorType: "system",
+      actorId: "heartbeat.activity-gate",
+      action: "reflection.activity_gate_fired",
+      entityType: "routine_run",
+      entityId: run.id,
+      details: {
+        ...logBase,
+        routineId: routine.id,
+        triggerId: apiTrigger.id,
+        idempotencyKey,
+      },
+    });
+
+    return {
+      outcome: "fired",
+      routineId: routine.id,
+      triggerId: apiTrigger.id,
+      routineRunId: run.id,
+      idempotencyKey,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.warn({ err, ...logBase }, "failed to fire reflection routine from activity gate");
+    try {
+      await logActivity(input.db, {
+        companyId: input.companyId,
+        actorType: "system",
+        actorId: "heartbeat.activity-gate",
+        action: "reflection.activity_gate_failed",
+        entityType: "agent",
+        entityId: input.agentId,
+        details: {
+          ...logBase,
+          error: message,
+          idempotencyKey,
+        },
+      });
+    } catch {
+      // best effort — never throw from the failure path
+    }
+    return { outcome: "failed", error: message, idempotencyKey };
+  }
+}
+
+/**
+ * Determine whether a wakeup carries an inbound signal that should fire the
+ * agent's activity-gated reflection routine. A signal-bearing wake is
+ * `source === "assignment"` with a payload mutation in
+ * {@link REFLECTION_SIGNAL_MUTATIONS}.
+ */
+export function isReflectionSignalWake(input: {
+  source: string;
+  payload: Record<string, unknown> | null;
+}): input is { source: "assignment"; payload: Record<string, unknown> } {
+  if (input.source !== "assignment") return false;
+  if (!input.payload) return false;
+  const mutation = input.payload.mutation;
+  return typeof mutation === "string" && REFLECTION_SIGNAL_MUTATIONS.has(mutation);
 }
 
 export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) {
@@ -9346,6 +9598,26 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
       }
 
       const newRun = outcome.run;
+      // Activity-gate: if this wake carried an inbound signal (assignment + signal mutation),
+      // fire the agent's reflection routine's api trigger. Failures are caught inside the
+      // helper and the call site adds a defensive catch so a routine-fire failure can NEVER
+      // break the wake. Fires before the live event is published so the routine dispatch is
+      // already in flight by the time the agent's UI updates.
+      if (newRun.wakeupRequestId && isReflectionSignalWake({ source, payload })) {
+        await maybeFireReflectionRoutine({
+          db,
+          companyId: agent.companyId,
+          agentId,
+          signal: (payload as { mutation: ReflectionSignal }).mutation,
+          issueId,
+          wakeupRequestId: newRun.wakeupRequestId,
+        }).catch((err) => {
+          logger.warn(
+            { err, agentId, issueId, wakeupRequestId: newRun.wakeupRequestId },
+            "activity-gate hook failed (caught at wake boundary)",
+          );
+        });
+      }
       publishLiveEvent({
         companyId: newRun.companyId,
         type: "heartbeat.run.queued",
@@ -9460,6 +9732,27 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
         updatedAt: new Date(),
       })
       .where(eq(agentWakeupRequests.id, wakeupRequest.id));
+
+    // Activity-gate: if this wake carried an inbound signal (assignment + signal mutation),
+    // fire the agent's reflection routine's api trigger. Failures are caught inside the
+    // helper and the call site adds a defensive catch so a routine-fire failure can NEVER
+    // break the wake. Fires before the live event is published so the routine dispatch is
+    // already in flight by the time the agent's UI updates.
+    if (newRun.wakeupRequestId && isReflectionSignalWake({ source, payload })) {
+      await maybeFireReflectionRoutine({
+        db,
+        companyId: agent.companyId,
+        agentId,
+        signal: (payload as { mutation: ReflectionSignal }).mutation,
+        issueId,
+        wakeupRequestId: newRun.wakeupRequestId,
+      }).catch((err) => {
+        logger.warn(
+          { err, agentId, issueId, wakeupRequestId: newRun.wakeupRequestId },
+          "activity-gate hook failed (caught at wake boundary)",
+        );
+      });
+    }
 
     publishLiveEvent({
       companyId: newRun.companyId,
