@@ -24,7 +24,7 @@ from app.config import get_settings
 from app.database import Base, engine, get_db_session
 from app.dependencies import get_current_user, require_admin
 from app.logging_config import LOG_CONFIG
-from app.models import User
+from app.models import User, WaitlistEntry
 from app.schemas import (
     AppleExchangeRequest,
     AppleExchangeResponse,
@@ -332,8 +332,29 @@ async def join_waitlist(
     payload: WaitlistJoinRequest,
     db: AsyncSession = Depends(get_db_session),
 ) -> WaitlistJoinResponse:
-    entry, position = await add_waitlist_entry(db, payload.email, payload.source, payload.archetype)
-    total = await get_waitlist_count(db)
+    # OS-1120: services.add_waitlist_entry has a hardcoded _ALLOWED_SOURCES
+    # whitelist that silently coerces any unknown source to "dashboard", which
+    # breaks channel attribution for marketing (OS-1083, OS-1079). Insert
+    # WaitlistEntry directly with a normalized source so Reddit/Product Hunt/
+    # podcast/etc. channels are recorded verbatim. The service still owns the
+    # archetype normalization; we replicate the small email/source/archetype
+    # normalization here intentionally.
+    source = (payload.source or "").strip().lower()[:64] or "dashboard"
+    archetype = (
+        payload.archetype.strip().lower()[:64] or None
+        if payload.archetype is not None
+        else None
+    )
+    entry = WaitlistEntry(
+        email=payload.email.lower()[:254],
+        source=source,
+        archetype=archetype,
+    )
+    db.add(entry)
+    await db.commit()
+    await db.refresh(entry)
+    position = await get_waitlist_count(db)
+    total = position
     return WaitlistJoinResponse(
         success=True,
         message="Successfully joined waitlist",
