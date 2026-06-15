@@ -85,6 +85,12 @@ class Settings(BaseSettings):
     sentry_traces_sample_rate: float = Field(default=0.1, validation_alias=AliasChoices("SENTRY_TRACES_SAMPLE_RATE"))
     telegram_bot_token: str | None = Field(default=None, validation_alias=AliasChoices("TELEGRAM_BOT_TOKEN"))
     telegram_chat_id: str | None = Field(default=None, validation_alias=AliasChoices("TELEGRAM_CHAT_ID"))
+    # OS-1117: shared secret for inbound bot updates. Set on Railway after
+    # merge via `openssl rand -hex 32`. Telegram sends it in the
+    # `X-Telegram-Bot-Api-Secret-Token` header on every webhook delivery.
+    telegram_webhook_secret: str | None = Field(
+        default=None, validation_alias=AliasChoices("TELEGRAM_WEBHOOK_SECRET")
+    )
     # Alert thresholds
     slow_response_threshold_ms: int = Field(default=500, validation_alias=AliasChoices("SLOW_RESPONSE_THRESHOLD_MS"))
 
