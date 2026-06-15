@@ -43,16 +43,37 @@ npm run build
 
 ---
 
+## CLI setup (once per machine)
+
+```bash
+# Install Vercel CLI to a local prefix if global install fails
+mkdir -p ~/.npm-global
+npm config set prefix '~/.npm-global'
+npm install -g vercel
+export PATH="$HOME/.npm-global/bin:$PATH"
+```
+
+Required environment variables (inject via secrets or shell):
+
+```bash
+export VERCEL_API_TOKEN=<token>          # injected by Paperclip harness
+export VERCEL_TEAM_ID=team_NymalvwjRk6LIjWvzEP4mtj0
+export VERCEL_PROJECT_ID=prj_ra28Zh8IoehysZsknj1j7DKbqbBw
+```
+
+---
+
 ## Deploy command
 
 ```bash
 # From the repo root (8os-dashboard/)
-vercel --prod --yes --token $Vercel_API_Token
+vercel deploy --prod --yes --token "$VERCEL_API_TOKEN"
 ```
 
 - `--prod` — promotes to the production alias (`8os.ai`)
 - `--yes` — non-interactive; skips project-link prompts
 - `--token` — uses the team API token (avoids interactive login)
+- No GitHub credentials required — direct CLI upload
 
 ---
 
@@ -75,7 +96,7 @@ rollback immediately.
 
 ```bash
 # Roll back to the previous deployment
-vercel rollback --token $Vercel_API_Token
+vercel rollback --token "$VERCEL_API_TOKEN"
 
 # Confirm rollback is live
 curl -sf https://8os.ai/api/health && echo "Rollback OK"

@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Suspense } from 'react'
 import { PostHogProvider } from '@/components/PostHogProvider'
 import { Header } from '@/components/Header'
+import { Footer } from '@/components/Footer'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -99,12 +100,18 @@ export default function RootLayout({
         />
       </head>
       <body>
+        <a href="#main-content" className="skip-link">
+          Skip to content
+        </a>
         <Header />
-        <Suspense>
-          <PostHogProvider>
-            {children}
-          </PostHogProvider>
-        </Suspense>
+        <div id="main-content" tabIndex={-1}>
+          <Suspense>
+            <PostHogProvider>
+              {children}
+            </PostHogProvider>
+          </Suspense>
+        </div>
+        <Footer />
       </body>
     </html>
   )

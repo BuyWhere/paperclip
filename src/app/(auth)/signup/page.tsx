@@ -6,12 +6,8 @@ import Link from 'next/link'
 import { GoogleAuthButton } from '@/components/auth/GoogleAuthButton'
 import { TelegramAuthButton } from '@/components/auth/TelegramAuthButton'
 
-type Step = 'form' | 'verify'
-
 export default function SignupPage() {
   const router = useRouter()
-  const [step, setStep] = useState<Step>('form')
-  const [userId, setUserId] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [warning, setWarning] = useState('')
@@ -20,7 +16,6 @@ export default function SignupPage() {
   // Form fields
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
-  const [otp, setOtp] = useState('')
 
   const isPhone = identifier.startsWith('+')
 
@@ -47,34 +42,8 @@ export default function SignupPage() {
         return
       }
 
-      setUserId(data.userId)
       if (data.pwnedWarning) setWarning(data.pwnedWarning)
-      setStep('verify')
-    } catch {
-      setError('Network error. Please try again.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function handleVerify(e: FormEvent) {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
-
-    try {
-      const res = await fetch('/api/auth/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, code: otp }),
-      })
-      const data = await res.json()
-
-      if (!res.ok) {
-        setError(typeof data.error === 'string' ? data.error : 'Verification failed')
-        return
-      }
-
+      // Session is created server-side on registration; redirect immediately
       router.push(data.redirectTo ?? '/onboarding')
     } catch {
       setError('Network error. Please try again.')
@@ -87,104 +56,67 @@ export default function SignupPage() {
     <main style={styles.main}>
       <div style={styles.card}>
         <h1 style={styles.logo}>8os</h1>
-        <h2 style={styles.heading}>
-          {step === 'form' ? 'Create your account' : 'Verify your identity'}
-        </h2>
+        <h2 style={styles.heading}>Create your account</h2>
 
         {error && <div style={styles.errorBox}>{error}</div>}
         {warning && <div style={styles.warningBox}>{warning}</div>}
 
-        {step === 'form' ? (
-          <form onSubmit={handleSignup} style={styles.form}>
-            <label style={styles.label}>
-              Email or phone number
+        <form onSubmit={handleSignup} style={styles.form}>
+          <label style={styles.label}>
+            Email or phone number
+            <input
+              type="text"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              placeholder="you@example.com or +1234567890"
+              required
+              autoComplete="username"
+              style={styles.input}
+            />
+          </label>
+
+          <label style={styles.label}>
+            Password
+            <div style={{ position: 'relative' }}>
               <input
-                type="text"
-                value={identifier}
-                onChange={(e) => setIdentifier(e.target.value)}
-                placeholder="you@example.com or +1234567890"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Min. 8 characters"
                 required
-                autoComplete="username"
-                style={styles.input}
+                minLength={8}
+                autoComplete="new-password"
+                style={{ ...styles.input, paddingRight: '3rem' }}
               />
-            </label>
-
-            <label style={styles.label}>
-              Password
-              <div style={{ position: 'relative' }}>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Min. 8 characters"
-                  required
-                  minLength={8}
-                  autoComplete="new-password"
-                  style={{ ...styles.input, paddingRight: '3rem' }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  style={styles.eyeBtn}
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                >
-                  {showPassword ? '🙈' : '👁'}
-                </button>
-              </div>
-            </label>
-
-            <button type="submit" disabled={loading} style={styles.btn}>
-              {loading ? 'Sending code…' : 'Continue'}
-            </button>
-
-            <div style={styles.divider}>
-              <span style={styles.dividerLine} />
-              <span style={styles.dividerText}>or</span>
-              <span style={styles.dividerLine} />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                style={styles.eyeBtn}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? '🙈' : '👁'}
+              </button>
             </div>
+          </label>
 
-            <GoogleAuthButton href="/api/auth/google?next=/onboarding" label="Continue with Google" />
-            <TelegramAuthButton mode="login" next="/onboarding" />
+          <button type="submit" disabled={loading} style={styles.btn}>
+            {loading ? 'Creating account…' : 'Create account'}
+          </button>
 
-            <p style={styles.footer}>
-              Already have an account?{' '}
-              <Link href="/login" style={styles.link}>Sign in</Link>
-            </p>
-          </form>
-        ) : (
-          <form onSubmit={handleVerify} style={styles.form}>
-            <p style={{ color: '#999', fontSize: '0.9rem', margin: '0 0 1.5rem' }}>
-              We sent a 6-digit code to <strong style={{ color: '#ededed' }}>{identifier}</strong>.
-            </p>
-            <label style={styles.label}>
-              Verification code
-              <input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]{6}"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                placeholder="000000"
-                required
-                maxLength={6}
-                autoComplete="one-time-code"
-                style={{ ...styles.input, fontSize: '1.5rem', letterSpacing: '0.5rem', textAlign: 'center' }}
-              />
-            </label>
+          <div style={styles.divider}>
+            <span style={styles.dividerLine} />
+            <span style={styles.dividerText}>or</span>
+            <span style={styles.dividerLine} />
+          </div>
 
-            <button type="submit" disabled={loading || otp.length !== 6} style={styles.btn}>
-              {loading ? 'Verifying…' : 'Verify & continue'}
-            </button>
+          <GoogleAuthButton href="/api/auth/google?next=/onboarding" label="Continue with Google" />
+          <TelegramAuthButton mode="login" next="/onboarding" />
 
-            <button
-              type="button"
-              onClick={() => { setStep('form'); setOtp('') }}
-              style={styles.ghostBtn}
-            >
-              Back
-            </button>
-          </form>
-        )}
+          <p style={styles.footer}>
+            Already have an account?{' '}
+            <Link href="/login" style={styles.link}>Sign in</Link>
+          </p>
+        </form>
       </div>
     </main>
   )

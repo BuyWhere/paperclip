@@ -33,6 +33,28 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -3rem;
+  z-index: 1000;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  background: var(--color-accent);
+  color: #fff;
+  text-decoration: none;
+  font-weight: 600;
+  transition: top 0.15s ease;
+}
+
+.skip-link:focus {
+  top: 1rem;
+}
+
+#main-content:focus {
+  outline: none;
+}
+
 /* Sidebar nav — desktop */
 .sidebar-desktop {
   display: block;

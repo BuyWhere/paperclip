@@ -5,6 +5,8 @@ import { jwtVerify, importSPKI } from 'jose'
 const PROTECTED_PREFIXES = [
   '/settings',
   '/admin',
+  '/dashboard',
+  '/onboarding',
 ]
 
 // ─── Security Headers (Task 11) ───────────────────────────────────────────────

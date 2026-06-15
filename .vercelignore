@@ -1,0 +1,5 @@
+.env
+backend/
+test-results/
+*.py
+*.test.yml

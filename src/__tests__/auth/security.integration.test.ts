@@ -54,6 +54,7 @@ jest.mock('@/lib/auth/rate-limit', () => ({
   resetLoginAttempts: jest.fn(async () => {}),
   consumeOtpRequest: jest.fn(async () => ({ remainingPoints: 9 })),
   consumeResetRequest: jest.fn(async () => ({ remainingPoints: 2 })),
+  consumeRegistrationRequest: jest.fn(async () => ({ remainingPoints: 19 })),
 }))
 
 jest.mock('@/lib/auth/otp', () => ({

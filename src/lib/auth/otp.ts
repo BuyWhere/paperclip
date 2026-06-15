@@ -25,7 +25,7 @@ export async function sendOtp(
 
 async function sendEmailOtp(email: string, code: string): Promise<void> {
   const nodemailer = await import('nodemailer')
-  const transporter = nodemailer.default.createTransport({
+  const transporter = (nodemailer.default ?? nodemailer).createTransport({
     host: process.env.SMTP_HOST || 'localhost',
     port: parseInt(process.env.SMTP_PORT || '587'),
     secure: process.env.SMTP_SECURE === 'true',

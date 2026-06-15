@@ -1,0 +1,8 @@
+{
+  "renames": [],
+  "sql": "-- Add performance index for email authentication lookups\nCREATE INDEX IF NOT EXISTS \"users_email_lookup_idx\" ON \"users\"(\"email\");\n\n-- Comment: This index optimizes email-based authentication queries\n-- even though there's already a unique constraint on the email field.\n",
+  "timestamps": {
+    "unapplied": "2026-05-26T00:00:00.000Z",
+    "applied": "2026-05-26T00:00:00.000Z"
+  }
+}
