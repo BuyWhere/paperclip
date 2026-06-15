@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Suspense } from 'react'
 import { PostHogProvider } from '@/components/PostHogProvider'
+import { MetaPixel } from '@/components/MetaPixel'
 import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
 import './globals.css'
@@ -100,6 +101,10 @@ export default function RootLayout({
         />
       </head>
       <body>
+        {/* Meta Pixel — fires PageView on every route change. Bails out when
+            NEXT_PUBLIC_META_PIXEL_ID is unset (local dev, pre-pixel deploys).
+            See src/components/MetaPixel.tsx. */}
+        <MetaPixel />
         <a href="#main-content" className="skip-link">
           Skip to content
         </a>
