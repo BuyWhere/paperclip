@@ -14,10 +14,10 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://8os.ai'),
   alternates: {
     canonical: '/',
-    languages: {
-      'en': '/en',
-      'zh': '/zh',
-    },
+    // Note: i18n routes (/en, /zh) removed from hreflang on 2026-06-15.
+    // The 8os.ai launch is English-only. We do not advertise non-existent
+    // language alternates to Google. To re-enable when real translations
+    // ship, add the routes back and restore the languages map.
   },
   openGraph: {
     type: 'website',
