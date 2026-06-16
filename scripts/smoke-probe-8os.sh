@@ -48,6 +48,20 @@ done
 declare -a RESULTS=()
 PASS_COUNT=0
 WARN_COUNT=0
+
+# json_escape STR — RFC 8259 string escape (handles \", \\, control chars).
+# Used by the --json output path. Without this, the header_probe FAIL line
+# would emit the regex (containing `\.`) as a literal `&\.`, which is
+# invalid JSON (only \" \\ / \b \f \n \r \t \uXXXX are valid escapes).
+json_escape() {
+  local s="$1"
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  s="${s//	/\\t}"
+  s="${s//$'\n'/\\n}"
+  s="${s//$'\r'/\\r}"
+  printf '%s' "$s"
+}
 FAIL_COUNT=0
 
 # probe NAME METHOD URL EXPECTED_REGEX [BODY] [CONTENT_TYPE]
@@ -217,7 +231,7 @@ if (( JSON_MODE == 1 )); then
     name="${rest%% *}"
     detail="${rest#* }"
     if (( first )); then first=0; else printf ','; fi
-    printf '{"status":"%s","name":"%s","detail":"%s"}' "$status" "$name" "$detail"
+    printf '{"status":"%s","name":"%s","detail":"%s"}' "$status" "$(json_escape "$name")" "$(json_escape "$detail")"
   done
   printf ']}\n'
 else
