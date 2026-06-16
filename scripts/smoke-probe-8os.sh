@@ -17,7 +17,7 @@
 #   scripts/smoke-probe-8os.sh --attempts 3   # override retry count
 #   scripts/smoke-probe-8os.sh --json          # emit machine-readable JSON for the agent
 #
-# Reference issues: OS-1180 (orig), OS-1192 (rev-5-compatible test patterns)
+# Reference issues: OS-1180 (orig), OS-1192 (rev-5-compatible test patterns), OS-1199 (Location-header audit signal for /api/auth/google)
 
 set -u
 set -o pipefail
@@ -118,11 +118,66 @@ body_probe() {
   return 1
 }
 
+# Header probe (asserts the value of a named response header matches a regex).
+# Use this to check e.g. the Location header on a 307 — status code alone is
+# not enough to confirm the user-facing flow works.
+# Args: name method url header_name expected_regex [body] [content_type]
+header_probe() {
+  local name="$1" method="$2" url="$3" header="$4" expected="$5" body="${6:-}" ctype="${7:-application/json}"
+  local attempt=1 last_code=000 last_header=""
+  while (( attempt <= ATTEMPTS )); do
+    local hdrfile="/tmp/smoke-hdr.$$"
+    if [[ -n "$body" ]]; then
+      last_code=$(curl -s -m 10 -D "$hdrfile" -o /dev/null -w "%{http_code}" -X "$method" "$url" -H "Content-Type: $ctype" -d "$body" 2>/dev/null || echo "000")
+    else
+      last_code=$(curl -s -m 10 -D "$hdrfile" -o /dev/null -w "%{http_code}" -X "$method" "$url" 2>/dev/null || echo "000")
+    fi
+    # Header match is case-insensitive; print only the value column.
+    last_header=$(awk -v IGNORECASE=1 -v want="$header" 'BEGIN{FS=": "} tolower($1)==tolower(want){sub(/\r$/,"",$2); print $2; exit}' "$hdrfile" 2>/dev/null)
+    rm -f "$hdrfile"
+
+    if [[ -n "$last_header" && "$last_header" =~ $expected ]]; then
+      if (( attempt == 1 )); then
+        RESULTS+=("PASS $name $header=$last_header")
+        PASS_COUNT=$((PASS_COUNT + 1))
+      else
+        RESULTS+=("WARN $name $header=$last_header (transient retry $attempt)")
+        WARN_COUNT=$((WARN_COUNT + 1))
+        PASS_COUNT=$((PASS_COUNT + 1))
+      fi
+      return 0
+    fi
+    attempt=$((attempt + 1))
+    sleep 1
+  done
+
+  RESULTS+=("FAIL $name $header expected=$expected got=$last_code header=${last_header:0:120}")
+  FAIL_COUNT=$((FAIL_COUNT + 1))
+  return 1
+}
+
 # --- Probes ----------------------------------------------------------------
 
 # OS-1144: defensive 307 on /api/auth/google when OAuth env vars are missing.
 # A regression here (HTTP 500) silently disables Google sign-in.
 probe "OS-1144 /api/auth/google defensive 307"   GET  https://8os.ai/api/auth/google                 '^307$'
+
+# OS-1199: status code 307 alone is not enough — the Location header must
+# point at Google's consent screen, not our error page. The previous probe
+# passed while the user-facing flow was broken (defensive 307 → /login?error=…)
+# because it only checked the status code. The 16:33Z CTO spot check used
+# this probe and was GREEN even though /api/auth/google was unusable to a
+# real user. This Location-header probe gives the T-7d audit the correct
+# signal: RED when env vars are missing (Location is the error page), GREEN
+# when the OAuth flow actually reaches Google.
+#
+# When working: Location: https://accounts.google.com/o/oauth2/v2/auth?…
+# When broken:  Location: https://8os.ai/login?error=Google%20sign-in%20is%20temporarily%20unavailable
+# Unblock: see OS-972 — board needs to set GOOGLE_CLIENT_ID,
+# GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, and AUTH_FLOW_SECRET on
+# prj_ra28Zh8IoehysZsknj1j7DKbqbBw.
+header_probe "OS-1199 /api/auth/google Location is Google consent" \
+  GET https://8os.ai/api/auth/google Location '^https://accounts\.google\.com/'
 
 # OS-1173: coming-soon landing page must serve a 200.
 probe "OS-1173 /coming-soon 200"                 GET  https://8os.ai/coming-soon                     '^200$'
