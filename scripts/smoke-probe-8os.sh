@@ -64,10 +64,17 @@ json_escape() {
 }
 FAIL_COUNT=0
 
-# probe NAME METHOD URL EXPECTED_REGEX [BODY] [CONTENT_TYPE]
+# probe NAME METHOD URL EXPECTED_REGEX [BODY] [CONTENT_TYPE] [SHARE_KEY]
 # EXPECTED_REGEX is matched against the HTTP status code (e.g. '^307$', '^(40[14]|405)$').
+# SHARE_KEY is an optional label: if set, the captured body is stashed under
+# that key (file: /tmp/smoke-body.<key>.<pid>) so a later body_probe with the
+# same SHARE_KEY can reuse it without firing another request. This avoids
+# the /api/waitlist 3/minute rate limit (orchestrator waitlist join has
+# `@limiter.limit("3/minute;10/hour")`) when status and body assertions
+# would otherwise fire two POSTs back-to-back. Without SHARE_KEY the probe
+# makes a fresh request (back-compat).
 probe() {
-  local name="$1" method="$2" url="$3" expected="$4" body="${5:-}" ctype="${6:-application/json}"
+  local name="$1" method="$2" url="$3" expected="$4" body="${5:-}" ctype="${6:-application/json}" share_key="${7:-}"
   local attempt=1 last_code=000 last_body=""
   while (( attempt <= ATTEMPTS )); do
     if [[ -n "$body" ]]; then
@@ -76,6 +83,9 @@ probe() {
       last_code=$(curl -s -m 10 -o /tmp/smoke-body.$$ -w "%{http_code}" -X "$method" "$url" 2>/dev/null || echo "000")
     fi
     last_body=$(head -c 240 /tmp/smoke-body.$$ 2>/dev/null | tr '\n' ' ' | tr -d '\r')
+    if [[ -n "$share_key" ]]; then
+      cp /tmp/smoke-body.$$ "/tmp/smoke-body.$share_key.$$" 2>/dev/null
+    fi
     rm -f /tmp/smoke-body.$$
 
     if [[ "$last_code" =~ $expected ]]; then
@@ -100,17 +110,28 @@ probe() {
 }
 
 # Body-shape probe (asserts a substring is present in the response body).
+# If SHARE_KEY matches a prior probe() with the same key, the cached body
+# file is reused — no new HTTP request. Falls back to a fresh request if
+# the cache is missing (e.g. the upstream probe failed and stashed nothing
+# matching the expected status, in which case the body probe will retry
+# with its own request).
 body_probe() {
-  local name="$1" method="$2" url="$3" expected_substr="$4" body="${5:-}" ctype="${6:-application/json}"
+  local name="$1" method="$2" url="$3" expected_substr="$4" body="${5:-}" ctype="${6:-application/json}" share_key="${7:-}"
   local attempt=1 last_code=000 last_body=""
   while (( attempt <= ATTEMPTS )); do
-    if [[ -n "$body" ]]; then
-      last_code=$(curl -s -m 10 -o /tmp/smoke-body.$$ -w "%{http_code}" -X "$method" "$url" -H "Content-Type: $ctype" -d "$body" 2>/dev/null || echo "000")
+    if [[ -n "$share_key" && -f "/tmp/smoke-body.$share_key.$$" ]]; then
+      # Reuse cached body from a prior probe() with the same share_key.
+      last_body=$(cat "/tmp/smoke-body.$share_key.$$" 2>/dev/null | tr '\n' ' ' | tr -d '\r')
+      last_code="cached"
     else
-      last_code=$(curl -s -m 10 -o /tmp/smoke-body.$$ -w "%{http_code}" -X "$method" "$url" 2>/dev/null || echo "000")
+      if [[ -n "$body" ]]; then
+        last_code=$(curl -s -m 10 -o /tmp/smoke-body.$$ -w "%{http_code}" -X "$method" "$url" -H "Content-Type: $ctype" -d "$body" 2>/dev/null || echo "000")
+      else
+        last_code=$(curl -s -m 10 -o /tmp/smoke-body.$$ -w "%{http_code}" -X "$method" "$url" 2>/dev/null || echo "000")
+      fi
+      last_body=$(cat /tmp/smoke-body.$$ 2>/dev/null | tr '\n' ' ' | tr -d '\r')
+      rm -f /tmp/smoke-body.$$
     fi
-    last_body=$(cat /tmp/smoke-body.$$ 2>/dev/null | tr '\n' ' ' | tr -d '\r')
-    rm -f /tmp/smoke-body.$$
 
     if [[ "$last_body" == *"$expected_substr"* ]]; then
       if (( attempt == 1 )); then
@@ -206,9 +227,13 @@ probe "OS-1173 /coming-soon 200"                 GET  https://8os.ai/coming-soon
 # and OS-1192 for the future-proofing rationale. Future revs can drop
 # rev-4-only items (`formtest`, `heidi-`, `paperclip.ing`, etc.) without
 # these probe rows slipping through.
+#
+# SHARE_KEY "waitlist" is set on both probes so the body assertion reuses
+# the cached response body from the status probe — fires only ONE POST
+# against the orchestrator's 3/minute rate limit instead of two.
 WAIT_BODY="{\"email\":\"test-alex-1180-smoke-$(date +%s)@paperclip.example\",\"source\":\"smoke-probe\"}"
-probe     "OS-1173 /api/waitlist POST 200"       POST https://8os.ai/api/waitlist                    '^200$' "$WAIT_BODY"
-body_probe "OS-1173 /api/waitlist body success:true" POST https://8os.ai/api/waitlist '"success":true' "$WAIT_BODY"
+probe     "OS-1173 /api/waitlist POST 200"       POST https://8os.ai/api/waitlist                    '^200$' "$WAIT_BODY" "" "waitlist"
+body_probe "OS-1173 /api/waitlist body success:true" POST https://8os.ai/api/waitlist '"success":true' "$WAIT_BODY" "" "waitlist"
 
 # OS-1117: orchestrator health — required for any Telegram/waitlist work.
 probe     "OS-1117 /api/health 200"              GET  https://api.8os.ai/health                      '^200$'
@@ -251,4 +276,12 @@ fi
 
 # Exit non-zero only on hard FAILs. WARNs (transient retries that recovered) do
 # not fail the probe — they show in output so the agent can decide to mention them.
-exit $FAIL_COUNT
+exit_code=$FAIL_COUNT
+
+# Clean up the body-cache files we stashed for share_key reuse. Each run
+# has its own $$ (PID), but prior runs may have left stale files around;
+# nuke any /tmp/smoke-body.* files older than 1 hour too.
+rm -f /tmp/smoke-body.$$ "/tmp/smoke-body."*".$$" 2>/dev/null
+find /tmp -maxdepth 1 -name 'smoke-body.*' -mmin +60 -delete 2>/dev/null
+
+exit $exit_code
