@@ -359,6 +359,20 @@ export default function QuizPage() {
               display: 'inline-block',
             }}
           />
+          {/* OS-1173: prelaunch /coming-soon cross-link on the quiz page. */}
+          <div style={{ marginTop: '1.5rem' }}>
+            <a
+              href="/coming-soon"
+              style={{
+                color: '#c4b5fd',
+                fontSize: '0.95rem',
+                textDecoration: 'none',
+                borderBottom: '1px solid rgba(196, 181, 253, 0.3)',
+              }}
+            >
+              Not ready? Reserve your spot for the July 7 launch →
+            </a>
+          </div>
           <p style={{ color: '#64748b', fontSize: '13px', marginTop: '12px' }}>
             Free · No credit card · No birth time needed
           </p>

@@ -242,7 +242,24 @@ export default function PricingPage() {
         <div style={ctaBoxStyle}>
           <h2 style={ctaTitleStyle}>Start for free today</h2>
           <p style={ctaDescStyle}>30 seconds. No credit card. Your archetype is waiting.</p>
-          <Link href="/onboarding" style={ctaButtonStyle}>Get Your Free Archetype</Link>
+          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <Link href="/onboarding" style={ctaButtonStyle}>Get Your Free Archetype</Link>
+            {/* OS-1173: cross-link to the prelaunch landing page. Pricing
+                visitors are high-intent; surface the affiliate program CTA
+                alongside the primary onboarding link. */}
+            <Link
+              href="/coming-soon"
+              style={{
+                ...ctaButtonStyle,
+                background: 'rgba(118, 75, 162, 0.15)',
+                border: '1px solid rgba(118, 75, 162, 0.5)',
+                boxShadow: 'none',
+                color: '#c4b5fd',
+              }}
+            >
+              Reserve your spot — July 7
+            </Link>
+          </div>
         </div>
       </div>
     </div>

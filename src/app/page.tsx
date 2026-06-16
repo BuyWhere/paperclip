@@ -93,6 +93,26 @@ export default function Home() {
           >
             Get Started
           </Link>
+          {/* OS-1173: cross-link to the prelaunch /coming-soon landing page so
+              visitors who want a focused reserve flow (with the affiliate
+              opt-in) have a clear next step beyond the in-page waitlist. */}
+          <Link
+            href="/coming-soon"
+            aria-label="Reserve your spot for the July 7 launch"
+            style={{
+              padding: '1rem 2rem',
+              fontSize: '1.125rem',
+              fontWeight: 600,
+              background: 'rgba(118, 75, 162, 0.12)',
+              border: '1px solid rgba(118, 75, 162, 0.5)',
+              borderRadius: '12px',
+              color: '#c4b5fd',
+              textDecoration: 'none',
+              transition: 'background 0.2s, border-color 0.2s',
+            }}
+          >
+            Reserve your spot — July 7
+          </Link>
           <Link
             href="#how-it-works"
             aria-label="See How It Works"

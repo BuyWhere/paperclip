@@ -30,6 +30,13 @@ class WaitlistEntry(Base):
     email: Mapped[str] = mapped_column(String(254), unique=True, index=True)
     source: Mapped[str] = mapped_column(String(64), default="dashboard")
     archetype: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # OS-1173: prelaunch landing page opt-in. Defaults to False so existing
+    # /waitlist/join callers (Next.js proxy, telegram bot, dashboard) keep
+    # the historical "no affiliate interest" semantics; the coming-soon form
+    # flips it on when the visitor checks the box.
+    affiliate_opt_in: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )
     early_access_sent: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

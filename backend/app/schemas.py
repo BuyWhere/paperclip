@@ -54,6 +54,10 @@ class WaitlistJoinRequest(BaseModel):
     email: EmailStr
     source: str = "dashboard"
     archetype: str | None = None
+    # OS-1173: opt-in for the affiliate-program recruitment list. The
+    # coming-soon landing page forwards this; legacy /waitlist/join callers
+    # (Next.js proxy, telegram bot) leave it as False.
+    affiliate_opt_in: bool = False
 
 
 class WaitlistJoinResponse(BaseModel):
@@ -70,6 +74,7 @@ class WaitlistEntryResponse(BaseModel):
     email: str
     source: str
     archetype: str | None = None
+    affiliate_opt_in: bool
     early_access_sent: bool
     created_at: datetime
 

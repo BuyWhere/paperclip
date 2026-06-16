@@ -76,6 +76,23 @@ export function Header() {
 
         {/* CTA */}
         <Link
+          href="/coming-soon"
+          onClick={() => posthog.capture('coming_soon_click', { source: 'header' })}
+          style={{
+            padding: '0.5rem 1.25rem',
+            background: 'rgba(118, 75, 162, 0.12)',
+            border: '1px solid rgba(118, 75, 162, 0.4)',
+            borderRadius: '8px',
+            color: '#c4b5fd',
+            textDecoration: 'none',
+            fontSize: '0.875rem',
+            fontWeight: 600,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          Reserve — July 7
+        </Link>
+        <Link
           href="/quiz"
           onClick={() => posthog.capture('quiz_start', { source: 'landing' })}
           style={{

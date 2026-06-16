@@ -217,6 +217,15 @@ export default function HowItWorksPage() {
           <div style={ctaGroupStyle}>
             <Link href="/onboarding" style={primaryCtaStyle}>Get Your Free Archetype →</Link>
             <Link href="/pricing" style={secondaryCtaStyle}>See Pricing</Link>
+            {/* OS-1173: cross-link to the prelaunch /coming-soon landing page
+                (CEO priority, unblocks the July 7 launch). Affiliate program
+                opt-in lives there. */}
+            <Link
+              href="/coming-soon"
+              style={{ ...secondaryCtaStyle, color: '#c4b5fd' }}
+            >
+              Reserve your spot — July 7 →
+            </Link>
           </div>
         </section>
       </div>

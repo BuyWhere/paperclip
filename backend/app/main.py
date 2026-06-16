@@ -24,7 +24,7 @@ from app.config import get_settings
 from app.database import Base, engine, get_db_session
 from app.dependencies import get_current_user, require_admin
 from app.logging_config import LOG_CONFIG
-from app.models import User
+from app.models import User, WaitlistEntry
 from app.schemas import (
     AppleExchangeRequest,
     AppleExchangeResponse,
@@ -131,6 +131,15 @@ async def lifespan(app: FastAPI):
         await conn.execute(text(
             "ALTER TABLE waitlist_entries "
             "ADD COLUMN IF NOT EXISTS archetype VARCHAR(64) NULL"
+        ))
+        # OS-1173: additive migration — add affiliate_opt_in column for the
+        # prelaunch /coming-soon landing page (CEO priority, unblocks OS-1086).
+        # DEFAULT FALSE keeps historical rows "no affiliate interest"; the
+        # coming-soon form flips it on via the Next.js /api/waitlist proxy.
+        await conn.execute(text(
+            "ALTER TABLE waitlist_entries "
+            "ADD COLUMN IF NOT EXISTS affiliate_opt_in BOOLEAN NOT NULL "
+            "DEFAULT FALSE"
         ))
 
     logger.info(json.dumps({
@@ -332,12 +341,40 @@ async def join_waitlist(
     payload: WaitlistJoinRequest,
     db: AsyncSession = Depends(get_db_session),
 ) -> WaitlistJoinResponse:
-    entry, position = await add_waitlist_entry(db, payload.email, payload.source, payload.archetype)
+    # OS-1120 + OS-1173: services.add_waitlist_entry has a hardcoded
+    # _ALLOWED_SOURCES whitelist that silently coerces any unknown source to
+    # "dashboard", which breaks channel attribution for marketing (OS-1083,
+    # OS-1079, OS-1086). Insert WaitlistEntry directly so Reddit/Product Hunt/
+    # podcast/coming-soon channels are recorded verbatim. We replicate the
+    # small email/source/archetype normalization here intentionally and now
+    # also forward the affiliate_opt_in flag the coming-soon landing page
+    # captures for OS-1173 + OS-1086.
+    source = (payload.source or "").strip().lower()[:64] or "dashboard"
+    archetype = (
+        payload.archetype.strip().lower()[:64] or None
+        if payload.archetype is not None
+        else None
+    )
+    entry = WaitlistEntry(
+        email=payload.email.lower()[:254],
+        source=source,
+        archetype=archetype,
+        affiliate_opt_in=bool(payload.affiliate_opt_in),
+    )
+    db.add(entry)
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        # OS-1173: surface duplicate as 409 so the Next.js proxy can map it
+        # to a clean "Email already on waitlist" error instead of 500.
+        raise HTTPException(status_code=409, detail="Email already on waitlist")
+    await db.refresh(entry)
     total = await get_waitlist_count(db)
     return WaitlistJoinResponse(
         success=True,
         message="Successfully joined waitlist",
-        position=position,
+        position=total,
         total=total,
     )
 
@@ -356,6 +393,7 @@ async def get_waitlist_stats(
                 email=e.email,
                 source=e.source,
                 archetype=e.archetype,
+                affiliate_opt_in=e.affiliate_opt_in,
                 early_access_sent=e.early_access_sent,
                 created_at=e.created_at,
             )
