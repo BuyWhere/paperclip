@@ -81,7 +81,11 @@ ENV NODE_ENV=production \
   PAPERCLIP_DEPLOYMENT_EXPOSURE=private \
   OPENCODE_ALLOW_ALL_MODELS=true
 
-VOLUME ["/paperclip"]
+# NOTE: `VOLUME ["/paperclip"]` removed — Railway V3 builder rejects
+# Docker VOLUME instructions (the platform manages the mount via
+# `volumeMounts` in serviceInstanceUpdate / serviceManifest). Re-adding
+# the line breaks every Railway build of PaperclipClean. See BUY-42324.
+
 EXPOSE 3100
 
 ENTRYPOINT ["docker-entrypoint.sh"]
