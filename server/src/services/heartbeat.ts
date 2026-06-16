@@ -2460,6 +2460,81 @@ export const REFLECTION_SIGNAL_MUTATIONS = new Set<string>([
 
 export type ReflectionSignal = "assigned" | "commented" | "status_changed" | "blocked";
 
+/**
+ * Map of legacy / non-spec wakeup mutation names to their semantic
+ * {@link ReflectionSignal}. The codebase has wakeup call sites that pre-date
+ * {@link REFLECTION_SIGNAL_MUTATIONS} (e.g. recovery-service assignments, plugin
+ * wakeups, tree-restoration, productivity-review) and use descriptive names like
+ * `assigned_todo_liveness_dispatch` or `plugin_wakeup`. Those wakeups are still
+ * signal-bearing for the activity-gated reflection cadence — they just need to
+ * be mapped onto a spec value so the routine's `payload.signal` stays inside
+ * the typed contract.
+ *
+ * This map is the single point of truth for that translation. New call sites
+ * SHOULD use the spec mutations directly. Existing call sites are translated
+ * here so the hook can fire consistently across all assignment wakeups.
+ */
+export const LEGACY_REFLECTION_MUTATION_SIGNALS: Readonly<Record<string, ReflectionSignal>> = Object.freeze({
+  // Recovery system wakeups — all semantically "assigned" (re-assignment after
+  // unblock, liveness dispatch, source-scoped recovery, etc).
+  "assigned_todo_liveness_dispatch": "assigned",
+  "unassigned_blocker_recovery": "assigned",
+  "source_scoped_recovery_action": "assigned",
+  "stale_active_run_evaluation": "assigned",
+
+  // Plugin wakeups — a plugin asking the runtime to wake the assignee is
+  // semantically the same as an assignment.
+  "plugin_wakeup": "assigned",
+
+  // Issue-tree restoration — the agent's issue is being re-presented after a
+  // tree-restore operation; treat it as an assignment signal.
+  "issue_tree_restored": "assigned",
+
+  // Productivity review — a review-issue being assigned to the source-issue
+  // owner is an assignment signal.
+  "productivity_review_assigned": "assigned",
+
+  // `create` / `interaction_accept` / `interaction` from queueIssueAssignmentWakeup
+  // callers in routes/issues.ts. These are queueIssueAssignmentWakeup call sites
+  // that pass descriptive mutations; semantically the assignee is being woken
+  // because of a new assignment or an interaction.
+  "create": "assigned",
+  "interaction_accept": "assigned",
+  "interaction": "commented",
+
+  // Defensive: routes that use `comment` / `update` / `document_annotation_comment`
+  // in their wakeup payloads. These are typically source=automation and won't
+  // reach the hook, but if any caller ever pairs them with source=assignment
+  // the mapping is here.
+  "comment": "commented",
+  "document_annotation_comment": "commented",
+  "update": "status_changed",
+  "checkout": "assigned",
+  "recovery_action_resolution": "status_changed",
+  "set": "status_changed",
+  "add": "status_changed",
+  "remove": "status_changed",
+});
+
+/**
+ * Resolve a `payload.mutation` value to its canonical {@link ReflectionSignal},
+ * or `null` if the mutation is not signal-bearing.
+ *
+ * Spec mutations ({@link REFLECTION_SIGNAL_MUTATIONS}) are returned unchanged
+ * via the fast path. Legacy / non-spec mutations are looked up in
+ * {@link LEGACY_REFLECTION_MUTATION_SIGNALS} and translated. Anything unknown
+ * returns `null` and the hook skips.
+ */
+export function resolveReflectionSignal(
+  mutation: string | undefined | null,
+): ReflectionSignal | null {
+  if (typeof mutation !== "string" || mutation.length === 0) return null;
+  if (REFLECTION_SIGNAL_MUTATIONS.has(mutation)) {
+    return mutation as ReflectionSignal;
+  }
+  return LEGACY_REFLECTION_MUTATION_SIGNALS[mutation] ?? null;
+}
+
 export interface MaybeFireReflectionRoutineInput {
   db: Db;
   companyId: string;
@@ -2680,8 +2755,10 @@ export async function maybeFireReflectionRoutine(
 /**
  * Determine whether a wakeup carries an inbound signal that should fire the
  * agent's activity-gated reflection routine. A signal-bearing wake is
- * `source === "assignment"` with a payload mutation in
- * {@link REFLECTION_SIGNAL_MUTATIONS}.
+ * `source === "assignment"` with a payload mutation that resolves to a
+ * {@link ReflectionSignal} (either a spec mutation in
+ * {@link REFLECTION_SIGNAL_MUTATIONS} or a legacy name mapped in
+ * {@link LEGACY_REFLECTION_MUTATION_SIGNALS}).
  */
 export function isReflectionSignalWake(input: {
   source: string;
@@ -2689,8 +2766,7 @@ export function isReflectionSignalWake(input: {
 }): input is { source: "assignment"; payload: Record<string, unknown> } {
   if (input.source !== "assignment") return false;
   if (!input.payload) return false;
-  const mutation = input.payload.mutation;
-  return typeof mutation === "string" && REFLECTION_SIGNAL_MUTATIONS.has(mutation);
+  return resolveReflectionSignal(input.payload.mutation as string | undefined) !== null;
 }
 
 export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) {
@@ -9604,11 +9680,17 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
       // break the wake. Fires before the live event is published so the routine dispatch is
       // already in flight by the time the agent's UI updates.
       if (newRun.wakeupRequestId && isReflectionSignalWake({ source, payload })) {
+        // resolveReflectionSignal is guaranteed non-null here because
+        // isReflectionSignalWake returned true; the resolver accepts both spec
+        // mutations and the legacy names in LEGACY_REFLECTION_MUTATION_SIGNALS.
+        const signal = resolveReflectionSignal(
+          (payload as { mutation: string | undefined }).mutation,
+        ) as ReflectionSignal;
         await maybeFireReflectionRoutine({
           db,
           companyId: agent.companyId,
           agentId,
-          signal: (payload as { mutation: ReflectionSignal }).mutation,
+          signal,
           issueId,
           wakeupRequestId: newRun.wakeupRequestId,
         }).catch((err) => {

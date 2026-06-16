@@ -1499,6 +1499,7 @@ export function recoveryService(db: Db, deps: { enqueueWakeup: RecoveryWakeup })
         reason: "issue_assigned",
         payload: withRecoveryModelProfileHint({
           issueId: evaluation.id,
+          mutation: "assigned",
           staleRunId: input.run.id,
           sourceIssueId: sourceIssue?.id ?? null,
         }, "status_only"),
@@ -1917,6 +1918,7 @@ export function recoveryService(db: Db, deps: { enqueueWakeup: RecoveryWakeup })
       reason: "issue_assigned",
       payload: withRecoveryModelProfileHint({
         issueId: recovery.id,
+        mutation: "assigned",
         sourceIssueId: input.issue.id,
         strandedRunId: input.latestRun?.id ?? null,
         recoveryCause,
@@ -2046,6 +2048,7 @@ export function recoveryService(db: Db, deps: { enqueueWakeup: RecoveryWakeup })
       idempotencyKey: `source_scoped_recovery_action:${input.action.id}:${input.action.attemptCount}`,
       payload: withRecoveryModelProfileHint({
         issueId: input.issue.id,
+        mutation: "assigned",
         sourceIssueId: input.issue.id,
         recoveryActionId: input.action.id,
         strandedRunId: input.latestRun?.id ?? null,
@@ -3339,6 +3342,7 @@ export function recoveryService(db: Db, deps: { enqueueWakeup: RecoveryWakeup })
       reason: "issue_assigned",
       payload: withRecoveryModelProfileHint({
         issueId: escalation.id,
+        mutation: "assigned",
         sourceIssueId: issue.id,
         recoveryIssueId: recoveryIssue.id,
         incidentKey: input.finding.incidentKey,

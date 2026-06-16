@@ -19,9 +19,11 @@ import {
   startEmbeddedPostgresTestDatabase,
 } from "./helpers/embedded-postgres.js";
 import {
+  LEGACY_REFLECTION_MUTATION_SIGNALS,
   REFLECTION_SIGNAL_MUTATIONS,
   isReflectionSignalWake,
   maybeFireReflectionRoutine,
+  resolveReflectionSignal,
   type ReflectionSignal,
 } from "../services/heartbeat.ts";
 import { instanceSettingsService } from "../services/instance-settings.ts";
@@ -165,24 +167,33 @@ describeEmbeddedPostgres("heartbeat activity-gate hook", () => {
     });
 
     it("rejects assignment source with non-signal mutations", () => {
+      // Truly unknown mutation names are still rejected.
       expect(
         isReflectionSignalWake({
           source: "assignment",
-          payload: { mutation: "create" },
+          payload: { mutation: "totally_unknown_mutation" },
         }),
       ).toBe(false);
       expect(
         isReflectionSignalWake({
           source: "assignment",
-          payload: { mutation: "update" },
+          payload: { mutation: "internal_healthcheck" },
         }),
       ).toBe(false);
-      expect(
-        isReflectionSignalWake({
-          source: "assignment",
-          payload: { mutation: "comment" },
-        }),
-      ).toBe(false);
+    });
+
+    it("accepts legacy production mutation names via LEGACY_REFLECTION_MUTATION_SIGNALS mapping", () => {
+      // Recovery-service / plugin / tree-restore / productivity-review / spec-drifted
+      // call sites all use descriptive mutations that map onto a ReflectionSignal.
+      for (const [legacy, expected] of Object.entries(LEGACY_REFLECTION_MUTATION_SIGNALS)) {
+        expect(
+          isReflectionSignalWake({
+            source: "assignment",
+            payload: { mutation: legacy },
+          }),
+          `legacy mutation ${legacy} should map to ${expected}`,
+        ).toBe(true);
+      }
     });
 
     it("rejects assignment source with missing or empty payload", () => {
@@ -198,6 +209,42 @@ describeEmbeddedPostgres("heartbeat activity-gate hook", () => {
           payload: {},
         }),
       ).toBe(false);
+    });
+  });
+
+  describe("resolveReflectionSignal", () => {
+    it("returns spec mutations unchanged (fast path)", () => {
+      expect(resolveReflectionSignal("assigned")).toBe("assigned");
+      expect(resolveReflectionSignal("commented")).toBe("commented");
+      expect(resolveReflectionSignal("status_changed")).toBe("status_changed");
+      expect(resolveReflectionSignal("blocked")).toBe("blocked");
+    });
+
+    it("maps legacy production mutations to their semantic signal", () => {
+      expect(resolveReflectionSignal("assigned_todo_liveness_dispatch")).toBe("assigned");
+      expect(resolveReflectionSignal("unassigned_blocker_recovery")).toBe("assigned");
+      expect(resolveReflectionSignal("plugin_wakeup")).toBe("assigned");
+      expect(resolveReflectionSignal("create")).toBe("assigned");
+      expect(resolveReflectionSignal("interaction_accept")).toBe("assigned");
+      expect(resolveReflectionSignal("comment")).toBe("commented");
+      expect(resolveReflectionSignal("update")).toBe("status_changed");
+    });
+
+    it("returns null for unknown mutations", () => {
+      expect(resolveReflectionSignal("totally_unknown_mutation")).toBe(null);
+      expect(resolveReflectionSignal("")).toBe(null);
+    });
+
+    it("returns null for nullish input", () => {
+      expect(resolveReflectionSignal(undefined)).toBe(null);
+      expect(resolveReflectionSignal(null)).toBe(null);
+    });
+
+    it("LEGACY_REFLECTION_MUTATION_SIGNALS is frozen and its values are spec signals", () => {
+      expect(Object.isFrozen(LEGACY_REFLECTION_MUTATION_SIGNALS)).toBe(true);
+      for (const signal of Object.values(LEGACY_REFLECTION_MUTATION_SIGNALS)) {
+        expect(REFLECTION_SIGNAL_MUTATIONS.has(signal)).toBe(true);
+      }
     });
   });
 

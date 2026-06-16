@@ -255,6 +255,7 @@ export function issueTreeControlRoutes(db: Db) {
               reason: "issue_tree_restored",
               payload: {
                 issueId: restoredIssue.id,
+                mutation: "assigned",
                 rootIssueId: root.id,
                 restoreHoldId: result.hold.id,
               },

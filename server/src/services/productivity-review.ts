@@ -739,6 +739,7 @@ export function productivityReviewService(db: Db, deps?: { enqueueWakeup?: Enque
         reason: "issue_assigned",
         payload: withRecoveryModelProfileHint({
           issueId: review.id,
+          mutation: "assigned",
           sourceIssueId: evidence.sourceIssue.id,
           trigger: evidence.trigger,
         }, "status_only"),

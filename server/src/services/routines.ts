@@ -1305,7 +1305,7 @@ export function routineService(
           heartbeat,
           issue: createdIssue,
           reason: "issue_assigned",
-          mutation: "create",
+          mutation: "assigned",
           contextSource: "routine.dispatch",
           requestedByActorType: input.source === "schedule" ? "system" : undefined,
           rethrowOnError: true,
