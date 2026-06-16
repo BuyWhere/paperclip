@@ -7366,12 +7366,15 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
       runScopedMentionedSkillKeys,
     );
     const runtimeSkillEntries = await companySkills.listRuntimeSkillEntries(agent.companyId);
-    let runtimeConfig = {
+    const runtimeConfig: Record<string, unknown> & {
+      paperclipRuntimeSkills: typeof runtimeSkillEntries;
+      instructionsFileContents?: string;
+    } = {
       ...effectiveResolvedConfig,
       paperclipRuntimeSkills: runtimeSkillEntries,
     };
-    if (asString(runtimeConfig.instructionsBundleMode) === "managed") {
-      const managedEntryFile = asString(runtimeConfig.instructionsEntryFile) ?? "AGENTS.md";
+    if (asString(runtimeConfig.instructionsBundleMode, "") === "managed") {
+      const managedEntryFile = asString(runtimeConfig.instructionsEntryFile, "") || "AGENTS.md";
       try {
         const managedEntry = await instructions.readFile({
           id: agent.id,

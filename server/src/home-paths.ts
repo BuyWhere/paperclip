@@ -1,4 +1,5 @@
 import path from "node:path";
+import { promises as fs } from "node:fs";
 const PATH_SEGMENT_RE = /^[a-zA-Z0-9_-]+$/;
 const FRIENDLY_PATH_SEGMENT_RE = /[^a-zA-Z0-9._-]+/g;
 import {
@@ -81,4 +82,27 @@ export function resolveManagedProjectWorkspaceDir(input: {
     sanitizeFriendlyPathSegment(projectId, "project"),
     sanitizeFriendlyPathSegment(input.repoName, "_default"),
   );
+}
+
+/**
+ * Ensure a per-agent home directory exists with owner-only permissions
+ * (mode 0o700). The agent home is created lazily on first heartbeat and
+ * stores managed instruction bundles (AGENTS.md, SOUL.md, etc.) that the
+ * runtime writes on behalf of the agent — restricting read+write to the
+ * owning user prevents other processes on the host from reading the
+ * instruction set.
+ *
+ * Returns the resolved absolute path so callers can use the result
+ * directly without re-resolving.
+ */
+export async function ensurePrivateDirectory(cwd: string): Promise<string> {
+  const resolved = path.resolve(cwd);
+  await fs.mkdir(resolved, { recursive: true, mode: 0o700 });
+  // Tighten the mode if the directory already existed with broader perms.
+  try {
+    await fs.chmod(resolved, 0o700);
+  } catch {
+    // chmod on a non-POSIX FS (e.g. Windows) is a best-effort tightening.
+  }
+  return resolved;
 }
