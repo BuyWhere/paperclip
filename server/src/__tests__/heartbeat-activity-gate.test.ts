@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { and, eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -483,6 +485,38 @@ describeEmbeddedPostgres("heartbeat activity-gate hook", () => {
 
       expect(result.outcome).toBe("skipped_no_api_trigger");
       expect(result.reason).toBe("fire_routine_returned_null");
+    });
+  });
+
+  describe("wake-boundary call sites", () => {
+    /**
+     * OS-1162 follow-up: the first commit only updated one of the two
+     * `source: "assignment"` wake-boundary call sites to use
+     * `resolveReflectionSignal`. The second call site still used the unsafe
+     * cast `(payload as { mutation: ReflectionSignal }).mutation`, which
+     * would pass any legacy mutation name (e.g. `assigned_todo_liveness_dispatch`)
+     * straight through to `maybeFireReflectionRoutine` as a `ReflectionSignal`
+     * even though it is not one.
+     *
+     * This static guard reads heartbeat.ts and asserts that the unsafe cast
+     * pattern is not present — the contract is "every wake-boundary call site
+     * must use the resolver, never the cast."
+     */
+    it("does not use the unsafe `payload as { mutation: ReflectionSignal }` cast at any wake-boundary call site", async () => {
+      const heartbeatPath = path.join(
+        path.dirname(new URL(import.meta.url).pathname),
+        "..",
+        "services",
+        "heartbeat.ts",
+      );
+      const source = await readFile(heartbeatPath, "utf8");
+      const unsafeCastCount = source.split(
+        "(payload as { mutation: ReflectionSignal })",
+      ).length - 1;
+      expect(
+        unsafeCastCount,
+        "every wake-boundary call site must pass resolveReflectionSignal(payload.mutation) to maybeFireReflectionRoutine; the unsafe `payload as { mutation: ReflectionSignal }` cast is forbidden because legacy mutation names would then be silently treated as a ReflectionSignal",
+      ).toBe(0);
     });
   });
 });

@@ -9821,11 +9821,17 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
     // break the wake. Fires before the live event is published so the routine dispatch is
     // already in flight by the time the agent's UI updates.
     if (newRun.wakeupRequestId && isReflectionSignalWake({ source, payload })) {
+      // resolveReflectionSignal is guaranteed non-null here because
+      // isReflectionSignalWake returned true; the resolver accepts both spec
+      // mutations and the legacy names in LEGACY_REFLECTION_MUTATION_SIGNALS.
+      const signal = resolveReflectionSignal(
+        (payload as { mutation: string | undefined }).mutation,
+      ) as ReflectionSignal;
       await maybeFireReflectionRoutine({
         db,
         companyId: agent.companyId,
         agentId,
-        signal: (payload as { mutation: ReflectionSignal }).mutation,
+        signal,
         issueId,
         wakeupRequestId: newRun.wakeupRequestId,
       }).catch((err) => {
