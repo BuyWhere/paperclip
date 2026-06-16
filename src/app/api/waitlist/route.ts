@@ -97,6 +97,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // OS-1187: pass through orchestrator 429s with the upstream Retry-After
+    // header so the form can back off cleanly. Previously the catch-all below
+    // converted 429 to 502 "Failed to join waitlist", which conflated rate
+    // limits with real upstream failures and made the smoke probe (OS-1180)
+    // body assertion fail 40-60% of the time during legitimate bursts.
+    if (orchResponse.status === 429) {
+      const retryAfter = orchResponse.headers.get('retry-after');
+      const headers: Record<string, string> = {};
+      if (retryAfter) headers['Retry-After'] = retryAfter;
+      return NextResponse.json(
+        { error: 'Rate limit exceeded — please try again in a moment' },
+        { status: 429, headers }
+      );
+    }
+
     if (!orchResponse.ok) {
       const errBody = await orchResponse.json().catch(() => ({}));
       const detail: string = (errBody as { detail?: string }).detail ?? '';
@@ -108,8 +123,13 @@ export async function POST(request: NextRequest) {
         );
       }
       console.error('Orchestrator waitlist error:', orchResponse.status, errBody);
+      // OS-1187: distinguish orchestrator 5xx (real upstream issue, e.g.
+      // Cloudflare 530 origin error) from network failures below. The
+      // orchestrator response was received, so surface its status + detail
+      // in the body so the form can show a useful message and the smoke
+      // probe can detect the 502 vs 429 vs 200 split.
       return NextResponse.json(
-        { error: 'Failed to join waitlist' },
+        { error: 'Failed to join waitlist', detail: detail || `orchestrator returned ${orchResponse.status}` },
         { status: 502 }
       );
     }
