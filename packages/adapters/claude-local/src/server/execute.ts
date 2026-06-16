@@ -396,7 +396,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
   const hasExplicitClaudeConfigDir =
     typeof configEnv.CLAUDE_CONFIG_DIR === "string" && configEnv.CLAUDE_CONFIG_DIR.trim().length > 0;
   const instructionsFilePath = asString(config.instructionsFilePath, "").trim();
-  const configuredInstructionsFileContents = asString(config.instructionsFileContents);
+  const configuredInstructionsFileContents = asString(config.instructionsFileContents, "");
   const instructionsFileDir = instructionsFilePath ? `${path.dirname(instructionsFilePath)}/` : "";
   const runtimeConfig = await buildClaudeRuntimeConfig({
     runId,
