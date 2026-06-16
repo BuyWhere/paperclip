@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// OS-1173: prefer the public api.8os.ai hostname (reachable from Vercel)
+// over the ORCHESTRATOR_URL env var, which is set to the unreachable
+// http://orchestrator.railway.internal:8000 in production. The env var
+// was a stale config from when the proxy ran inside the same Railway
+// service mesh; the Next.js app now lives on Vercel and only the public
+// hostname works. Fall back to ORCHESTRATOR_URL for any future in-mesh
+// deploy, then to the orchestrator-production Railway URL as last resort.
 const ORCHESTRATOR_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
   process.env.ORCHESTRATOR_URL ||
-  'https://orchestrator-production-1643.up.railway.app';
+  'https://api.8os.ai';
 
 // OS-1173: allow the prelaunch /coming-soon landing page to attribute its
 // signups (vs the dashboard waitlist form, telegram bot, and 8os.ai homepage).
@@ -114,10 +122,22 @@ export async function POST(request: NextRequest) {
       position: data.position,
       total: data.total,
     });
-  } catch {
+  } catch (err) {
+    // OS-1173: distinguish upstream/orchestrator failures from a malformed
+    // request body. The catch wraps both `request.json()` and the fetch to
+    // the orchestrator, so report the failure accurately so the form can
+    // show a useful message.
+    console.error('Waitlist proxy error:', err);
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    if (msg.includes('JSON')) {
+      return NextResponse.json(
+        { error: 'Invalid request body' },
+        { status: 400 }
+      );
+    }
     return NextResponse.json(
-      { error: 'Invalid request body' },
-      { status: 400 }
+      { error: 'Upstream waitlist service unavailable' },
+      { status: 502 }
     );
   }
 }
