@@ -245,6 +245,23 @@ body_probe "OS-1117 /api/health body redis:ok"     GET  https://api.8os.ai/healt
 probe "OS-1117 /telegram/webhook GET non-200"   GET  https://api.8os.ai/telegram/webhook             '^(40[145]|404)$'
 probe "OS-1117 /telegram/webhook POST 401"      POST https://api.8os.ai/telegram/webhook             '^401$' '{}'
 
+# OS-1092: web-dashboard DELETE /api/waitlist proxy. Two assertions:
+#  1) Unauthenticated DELETE -> 401 (proves the admin-auth gate is wired
+#     and the route is registered, not a generic 404). Also accepts 405
+#     so the probe is "soft" until the proxy is actually deployed.
+#  2) Authenticated DELETE with non-integer id -> 400 (proves the input
+#     validation runs before fetch, so a typo on the form doesn't trigger
+#     a 502 against the orchestrator). Also accepts 405 pre-deploy.
+#
+# Pre-deploy (proxy not yet shipped to Vercel): both probes see 405
+# (Method Not Allowed, because Next.js has no DELETE handler). Once the
+# board opens the alex/os-1092-waitlist-delete-proxy PR and a manual
+# `vercel deploy` lands, the assertions will tighten to 401 + 400.
+# Use a definitely-not-real id ("notanint") so a misbehaving proxy
+# can't accidentally mutate real data.
+probe "OS-1092 /api/waitlist DELETE 401 (no auth)" DELETE https://8os.ai/api/waitlist?id=1              '^(40[15])$'
+probe "OS-1092 /api/waitlist DELETE 400 (bad id)"  DELETE https://8os.ai/api/waitlist?id=notanint      '^(40[05])$'
+
 # --- Output ----------------------------------------------------------------
 
 if (( JSON_MODE == 1 )); then
