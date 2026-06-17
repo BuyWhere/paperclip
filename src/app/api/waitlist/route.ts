@@ -188,3 +188,92 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ count: 0, entries: [] }, { status: 200 });
   }
 }
+
+// OS-1239: add DELETE branch so the Vercel proxy forwards row-deletion
+// requests to the orchestrator's /waitlist/entry/{entry_id} endpoint
+// (restored on api.8os.ai in OS-1237). Required for Mira's test-row
+// scrub and any future GDPR right-to-erasure. The orchestrator's
+// require_admin gate validates the x-api-key header against
+// ADMIN_API_KEY (set on both Vercel and Railway). The proxy refuses
+// requests that don't include either a query string `id` or a JSON
+// body `id`, and returns the orchestrator's 404 verbatim so admin
+// tooling can distinguish missing-vs-actually-deleted.
+export async function DELETE(request: NextRequest) {
+  const adminApiKey = process.env.ADMIN_API_KEY;
+  if (!adminApiKey) {
+    return NextResponse.json(
+      { error: 'Server misconfigured: ADMIN_API_KEY unset' },
+      { status: 503 }
+    );
+  }
+
+  // Accept id from either query string (?id=<uuid>) or JSON body. The
+  // query string form is friendlier for browser-based admin tooling.
+  const { searchParams } = new URL(request.url);
+  let id = searchParams.get('id');
+
+  if (!id) {
+    try {
+      const body = await request.json();
+      if (typeof body?.id === 'string') {
+        id = body.id;
+      }
+    } catch {
+      // body wasn't JSON; fall through to the missing-id branch below
+    }
+  }
+
+  if (!id) {
+    return NextResponse.json(
+      { error: 'Missing id (?id=<uuid> or {"id": "<uuid>"})' },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const orchResponse = await fetch(`${ORCHESTRATOR_URL}/waitlist/entry/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: { 'x-api-key': adminApiKey },
+    });
+
+    if (orchResponse.status === 404) {
+      // Idempotent: 404 from the orchestrator means "already gone" — admin
+      // tooling can treat it as success-or-ambiguous. Forward the 404 so
+      // the caller can decide, but the smoke probe treats 404 as a
+      // legitimate terminal state (vs 401/500/502 which are real bugs).
+      return NextResponse.json(
+        { success: false, error: 'Entry not found', id },
+        { status: 404 }
+      );
+    }
+
+    if (orchResponse.status === 401) {
+      // Orchestrator rejected our x-api-key (it shouldn't — the value is
+      // the same ADMIN_API_KEY on both sides — but if it does, return
+      // 401 verbatim so the smoke probe flags it as a config mismatch).
+      return NextResponse.json(
+        { error: 'Orchestrator rejected admin key' },
+        { status: 401 }
+      );
+    }
+
+    if (!orchResponse.ok) {
+      const errBody = await orchResponse.json().catch(() => ({}));
+      const detail: string = (errBody as { detail?: string }).detail ?? '';
+      console.error('Orchestrator waitlist delete error:', orchResponse.status, errBody);
+      return NextResponse.json(
+        { error: 'Failed to delete waitlist entry', detail: detail || `orchestrator returned ${orchResponse.status}` },
+        { status: 502 }
+      );
+    }
+
+    const data = await orchResponse.json() as { deleted: boolean; id: string };
+    return NextResponse.json({ success: true, deleted: data.deleted, id: data.id });
+  } catch (err) {
+    console.error('Waitlist delete proxy error:', err);
+    return NextResponse.json(
+      { error: 'Upstream waitlist service unavailable' },
+      { status: 502 }
+    );
+  }
+}
