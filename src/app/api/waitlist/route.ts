@@ -34,6 +34,24 @@ const ALLOWED_SOURCES = [
 // attribution is preserved while source length stays inside the 64-char
 // VARCHAR cap on the waitlist_entries table. The FastAPI backend has its
 // own pass that re-applies this normalization.
+
+// OS-1242: reserved/special-use TLDs the orchestrator's pydantic EmailStr
+// rejects with 422 "special-use or reserved name". Verified against live
+// api.8os.ai on 2026-06-17. The proxy mirrors the check so reserved-TLD
+// input never round-trips to the orchestrator and never wraps as a
+// misleading 502 to the form.
+//
+// Note: `.example` is NOT in the list — pydantic accepts it (the smoke
+// probe at scripts/smoke-probe-8os.sh posts to @paperclip.example
+// intentionally; that path must keep working). Only the TLDs that
+// pydantic's email-validator actually rejects are listed.
+const RESERVED_TLDS = new Set([
+  'local',       // RFC 6762: mDNS link-local
+  'localhost',   // RFC 6761: loopback
+  'test',        // RFC 2606: testing
+  'invalid',     // RFC 2606: obviously invalid
+  'onion',       // RFC 7686: Tor hidden services
+]);
 function normalizeSource(raw: string): string {
   const slug = raw
     .trim()
@@ -65,6 +83,23 @@ export async function POST(request: NextRequest) {
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
+      return NextResponse.json(
+        { error: 'Invalid email format' },
+        { status: 400 }
+      );
+    }
+
+    // OS-1242: pre-validate reserved/special-use TLDs (RFC 6761 / RFC 2606)
+    // at the proxy so reserved-TLD emails return 400 with the same
+    // "Invalid email format" shape as other invalid-input cases, instead
+    // of being wrapped as 502 "Upstream waitlist service unavailable" by
+    // the catch-all error handler below. Real users typing typos like
+    // `gmail.local` (a common .com mis-type) used to see a generic
+    // server-error page; the orchestrator's pydantic EmailStr rejects
+    // them with 422 + a useful detail, and we now catch them client-side
+    // to avoid the round-trip and the misleading 502.
+    const tld = email.toLowerCase().split('.').pop() ?? '';
+    if (RESERVED_TLDS.has(tld)) {
       return NextResponse.json(
         { error: 'Invalid email format' },
         { status: 400 }
@@ -114,12 +149,36 @@ export async function POST(request: NextRequest) {
 
     if (!orchResponse.ok) {
       const errBody = await orchResponse.json().catch(() => ({}));
-      const detail: string = (errBody as { detail?: string }).detail ?? '';
+      // Pydantic returns `detail` as an array of {msg,...} objects;
+      // SQLAlchemy / hand-raised 5xx return a string. Normalize to a
+      // string before any string ops so the duplicate-key check below
+      // doesn't throw on a non-string detail.
+      const detailRaw = (errBody as { detail?: unknown }).detail;
+      const detail: string = Array.isArray(detailRaw)
+        ? ((detailRaw[0] as { msg?: string } | undefined)?.msg ?? '')
+        : typeof detailRaw === 'string'
+          ? detailRaw
+          : '';
       // SQLAlchemy unique constraint violation surfaces as 500 with "duplicate key" in detail
       if (detail.toLowerCase().includes('duplicate') || detail.toLowerCase().includes('unique')) {
         return NextResponse.json(
           { error: 'Email already on waitlist' },
           { status: 409 }
+        );
+      }
+      // OS-1242: pass through orchestrator 422 (validation) so the form
+      // gets a useful 4xx instead of a misleading 502. The pre-validation
+      // blocklist above catches reserved TLDs at the proxy, so this
+      // branch is a defense-in-depth fallback for any future pydantic
+      // rejection (new reserved TLD, deliverability check, etc.) the
+      // blocklist doesn't know about.
+      if (orchResponse.status === 422) {
+        return NextResponse.json(
+          {
+            error: 'Invalid email format',
+            detail: detail || 'Email failed validation',
+          },
+          { status: 422 }
         );
       }
       console.error('Orchestrator waitlist error:', orchResponse.status, errBody);
