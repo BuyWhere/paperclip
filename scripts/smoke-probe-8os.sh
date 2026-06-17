@@ -39,6 +39,14 @@ JSON_MODE=0
 BASE_URL="https://8os.ai"
 ORCH_BASE_URL="https://api.8os.ai"
 SKIP_ORCHESTRATOR=0
+# Optional Vercel automation-bypass header for probing candidate URLs
+# (https://8os-<hash>-<team>.vercel.app) on the password-protected
+# 8os project (ssoProtection.deploymentType=all_except_custom_domains).
+# Default: empty (no bypass — fine for 8os.ai which is on a custom
+# domain and exempt from SSO). Pass `--bypass-secret` or set the
+# `SMOKE_PROBE_BYPASS_SECRET` env var to enable. See OS-1239 / OS-1243.
+BYPASS_HEADER=()
+BYPASS_SECRET="${SMOKE_PROBE_BYPASS_SECRET:-}"
 # Arg parsing uses while+shift (NOT `for arg in "$@"` — that pattern
 # snapshots the args at loop start, so the `shift` inside the loop body
 # is a no-op and a separate value like `--attempts 3` is parsed as
@@ -54,6 +62,8 @@ while [[ $# -gt 0 ]]; do
     --base-url)        BASE_URL="${2:?missing value for --base-url}"; shift 2 ;;
     --base-url=*)      BASE_URL="${1#*=}"; shift ;;
     --skip-orchestrator) SKIP_ORCHESTRATOR=1; shift ;;
+    --bypass-secret)   BYPASS_SECRET="${2:?missing value for --bypass-secret}"; shift 2 ;;
+    --bypass-secret=*) BYPASS_SECRET="${1#*=}"; shift ;;
     -h|--help)
       sed -n '2,32p' "$0" | sed 's/^# \{0,1\}//'
       exit 0
@@ -61,6 +71,14 @@ while [[ $# -gt 0 ]]; do
     *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
 done
+
+# Materialize the bypass header (if a secret was provided) so all
+# downstream curl calls can splice it in. Empty BYPASS_HEADER means no
+# extra header — same as the previous behavior, so production probes
+# against 8os.ai keep working unchanged.
+if [[ -n "$BYPASS_SECRET" ]]; then
+  BYPASS_HEADER=(-H "x-vercel-protection-bypass: $BYPASS_SECRET")
+fi
 
 # Strip trailing slash from BASE_URL so concatenations like
 # "$BASE_URL/coming-soon" don't end up with a double slash. Vercel
@@ -111,9 +129,9 @@ probe() {
   local attempt=1 last_code=000 last_body=""
   while (( attempt <= ATTEMPTS )); do
     if [[ -n "$body" ]]; then
-      last_code=$(curl -s -m 10 -o /tmp/smoke-body.$$ -w "%{http_code}" -X "$method" "$url" -H "Content-Type: $ctype" -d "$body" 2>/dev/null || echo "000")
+      last_code=$(curl -s -m 10 -o /tmp/smoke-body.$$ -w "%{http_code}" -X "$method" "$url" "${BYPASS_HEADER[@]}" -H "Content-Type: $ctype" -d "$body" 2>/dev/null || echo "000")
     else
-      last_code=$(curl -s -m 10 -o /tmp/smoke-body.$$ -w "%{http_code}" -X "$method" "$url" 2>/dev/null || echo "000")
+      last_code=$(curl -s -m 10 -o /tmp/smoke-body.$$ -w "%{http_code}" -X "$method" "$url" "${BYPASS_HEADER[@]}" 2>/dev/null || echo "000")
     fi
     last_body=$(head -c 240 /tmp/smoke-body.$$ 2>/dev/null | tr '\n' ' ' | tr -d '\r')
     if [[ -n "$share_key" ]]; then
@@ -196,9 +214,9 @@ header_probe() {
   while (( attempt <= ATTEMPTS )); do
     local hdrfile="/tmp/smoke-hdr.$$"
     if [[ -n "$body" ]]; then
-      last_code=$(curl -s -m 10 -D "$hdrfile" -o /dev/null -w "%{http_code}" -X "$method" "$url" -H "Content-Type: $ctype" -d "$body" 2>/dev/null || echo "000")
+      last_code=$(curl -s -m 10 -D "$hdrfile" -o /dev/null -w "%{http_code}" -X "$method" "$url" "${BYPASS_HEADER[@]}" -H "Content-Type: $ctype" -d "$body" 2>/dev/null || echo "000")
     else
-      last_code=$(curl -s -m 10 -D "$hdrfile" -o /dev/null -w "%{http_code}" -X "$method" "$url" 2>/dev/null || echo "000")
+      last_code=$(curl -s -m 10 -D "$hdrfile" -o /dev/null -w "%{http_code}" -X "$method" "$url" "${BYPASS_HEADER[@]}" 2>/dev/null || echo "000")
     fi
     # Header match is case-insensitive; print only the value column.
     last_header=$(awk -v IGNORECASE=1 -v want="$header" 'BEGIN{FS=": "} tolower($1)==tolower(want){sub(/\r$/,"",$2); print $2; exit}' "$hdrfile" 2>/dev/null)
