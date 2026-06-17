@@ -296,7 +296,7 @@ fi
 #  1) Unauthenticated DELETE -> 401 (proves the admin-auth gate is wired
 #     and the route is registered, not a generic 404). Also accepts 405
 #     so the probe is "soft" until the proxy is actually deployed.
-#  2) Authenticated DELETE with non-integer id -> 400 (proves the input
+#  2) Authenticated DELETE with malformed id -> 400 (proves the input
 #     validation runs before fetch, so a typo on the form doesn't trigger
 #     a 502 against the orchestrator). Also accepts 405 pre-deploy.
 #
@@ -304,10 +304,15 @@ fi
 # (Method Not Allowed, because Next.js has no DELETE handler). Once the
 # board opens the alex/os-1092-waitlist-delete-proxy PR and a manual
 # `vercel deploy` lands, the assertions will tighten to 401 + 400.
-# Use a definitely-not-real id ("notanint") so a misbehaving proxy
-# can't accidentally mutate real data.
+#
+# OS-1237: the id regex was widened from `^[1-9][0-9]*$` (positive int)
+# to `^[A-Za-z0-9-]{1,64}$` (UUID-shaped strings) because the orchestrator
+# uses String(36) UUIDs, not integers. The previous "notanint" id is
+# all-alphanumeric and would now pass the regex; we use "bad!id" (special
+# char) so the proxy's pre-validation still 400s in post-deploy. Pre-deploy
+# the proxy is not registered, so the assertion still 405s.
 probe "OS-1092 /api/waitlist DELETE 401 (no auth)" DELETE "$BASE_URL/api/waitlist?id=1"              '^(40[15])$'
-probe "OS-1092 /api/waitlist DELETE 400 (bad id)"  DELETE "$BASE_URL/api/waitlist?id=notanint"      '^(40[05])$'
+probe "OS-1092 /api/waitlist DELETE 400 (bad id)"  DELETE "$BASE_URL/api/waitlist?id=bad%21id"      '^(40[05])$'
 
 # --- Output ----------------------------------------------------------------
 
