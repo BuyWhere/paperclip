@@ -293,21 +293,21 @@ probe "OS-1117 /telegram/webhook POST 401"      POST "$ORCH_BASE_URL/telegram/we
 fi
 
 # OS-1092: web-dashboard DELETE /api/waitlist proxy. Two assertions:
-#  1) Unauthenticated DELETE -> 401 (proves the admin-auth gate is wired
-#     and the route is registered, not a generic 404). Also accepts 405
-#     so the probe is "soft" until the proxy is actually deployed.
-#  2) Authenticated DELETE with non-integer id -> 400 (proves the input
-#     validation runs before fetch, so a typo on the form doesn't trigger
-#     a 502 against the orchestrator). Also accepts 405 pre-deploy.
+#  1) DELETE with no id (?id missing) -> 400 (proxy-side validation
+#     catches the missing id before forwarding to the orchestrator).
+#  2) DELETE with id that doesn't exist -> 404 (proxy forwards to
+#     orchestrator which returns "Entry not found"; the proxy returns
+#     404 verbatim).
 #
-# Pre-deploy (proxy not yet shipped to Vercel): both probes see 405
-# (Method Not Allowed, because Next.js has no DELETE handler). Once the
-# board opens the alex/os-1092-waitlist-delete-proxy PR and a manual
-# `vercel deploy` lands, the assertions will tighten to 401 + 400.
+# Pre-OS-1239 the proxy only implemented POST + GET, so DELETE returned
+# 405 (Method Not Allowed). The probe used to accept 405 as a soft
+# pass so it could be wired up before the proxy shipped. Post-OS-1239
+# (branch alex/os-1239-waitlist-delete-proxy @ 0d0a55da) the proxy
+# implements DELETE and the assertions tightened to 400 + 404.
 # Use a definitely-not-real id ("notanint") so a misbehaving proxy
 # can't accidentally mutate real data.
-probe "OS-1092 /api/waitlist DELETE 401 (no auth)" DELETE "$BASE_URL/api/waitlist?id=1"              '^(40[15])$'
-probe "OS-1092 /api/waitlist DELETE 400 (bad id)"  DELETE "$BASE_URL/api/waitlist?id=notanint"      '^(40[05])$'
+probe "OS-1092 /api/waitlist DELETE 400 (no id)"    DELETE "$BASE_URL/api/waitlist"                 '^400$'
+probe "OS-1092 /api/waitlist DELETE 404 (bad id)"   DELETE "$BASE_URL/api/waitlist?id=notanint"     '^404$'
 
 # --- Output ----------------------------------------------------------------
 
