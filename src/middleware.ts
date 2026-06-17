@@ -84,6 +84,19 @@ async function getPublicKey() {
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
 
+  // OS-1253: handle /en /zh /register at the edge with a proper 307+Location
+  // so the redirect cannot be intercepted by the global error boundary at
+  // build time. page.tsx stubs stay for build-time coverage; runtime traffic
+  // never reaches them.
+  if (pathname === '/en' || pathname === '/zh') {
+    const res = NextResponse.redirect(new URL('/', req.url), 307)
+    return applySecurityHeaders(res, req)
+  }
+  if (pathname === '/register') {
+    const res = NextResponse.redirect(new URL('/signup', req.url), 307)
+    return applySecurityHeaders(res, req)
+  }
+
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     const preflight = new NextResponse(null, { status: 204 })
