@@ -169,11 +169,23 @@ echo "→ candidate URL: $CANDIDATE_URL"
 
 # --- step 3: wait for candidate to be reachable ---------------------------
 
+# The 8os Vercel project (prj_ra28Zh8IoehysZsknj1j7DKbqbBw) has
+# ssoProtection.deploymentType=all_except_custom_domains, so the candidate
+# URL (https://8os-<hash>-<team>.vercel.app) is behind Vercel SSO and
+# /api/health returns 401 without the automation-bypass header. The
+# bypass header is the right tool for CI/agent previews — see OS-1239 /
+# OS-1243. Allow override via env so we can rotate the secret without
+# editing this script.
+VERCEL_PROTECTION_BYPASS="${VERCEL_PROTECTION_BYPASS:-imKa3ZavxXlLvcux1rGYELOGdVWjZyaw}"
+health_curl=(curl -s -m 5 -o /dev/null -w "%{http_code}"
+             -H "x-vercel-protection-bypass: $VERCEL_PROTECTION_BYPASS"
+             "$CANDIDATE_URL/api/health")
+
 banner "Step 3/5: wait for candidate $CANDIDATE_URL to be reachable (max ${HEALTH_TIMEOUT}s)"
 elapsed=0
 ready=0
 while (( elapsed < HEALTH_TIMEOUT )); do
-  if code=$(curl -s -m 5 -o /dev/null -w "%{http_code}" "$CANDIDATE_URL/api/health" 2>/dev/null); then
+  if code=$("${health_curl[@]}" 2>/dev/null); then
     if [[ "$code" == "200" ]]; then
       ready=1
       break
@@ -195,7 +207,12 @@ echo "→ candidate is up (200 on /api/health after ${elapsed}s)"
 banner "Step 4/5: smoke probe against $CANDIDATE_URL"
 PROBE_JSON=/tmp/deploy-gate-probe.json
 set +e
+# Pass the Vercel automation-bypass secret to the smoke probe so the
+# candidate-URL probes (which hit the same SSO-protected host as step 3)
+# aren't all 401'd. The secret was already used in step 3 to wait for
+# /api/health. See OS-1239 / OS-1243.
 "$PROBE" --base-url "$CANDIDATE_URL" --skip-orchestrator \
+  --bypass-secret "$VERCEL_PROTECTION_BYPASS" \
   --attempts "$PROBE_ATTEMPTS" --json >"$PROBE_JSON" 2>&1
 probe_rc=$?
 set -e
