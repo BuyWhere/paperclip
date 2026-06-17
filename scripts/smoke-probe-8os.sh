@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
-# 8os defensive-fix smoke probe — run on every CTO heartbeat.
-# Asserts the public endpoints behind each known-good defensive fix are still live.
+# 8os defensive-fix smoke probe — run on every CTO heartbeat and on every
+# gated deploy (see scripts/deploy-with-gate.sh, OS-1221).
+#
+# Asserts the public endpoints behind each known-good defensive fix are
+# still live. By default probes run against https://8os.ai (production);
+# pass --base-url to probe a different deployment — typically the
+# candidate build URL Vercel prints during `vercel deploy` (without
+# --prod), e.g. https://dpl-xxx-username.vercel.app. This is what
+# the pre-deploy smoke gate uses to veto a promotion before it
+# touches the production alias.
 #
 # Exit codes:
 #   0   all probes pass
@@ -13,29 +21,54 @@
 # as WARN (counted as pass for the exit code, but flagged in output).
 #
 # Usage:
-#   scripts/smoke-probe-8os.sh                 # default: 2 attempts
-#   scripts/smoke-probe-8os.sh --attempts 3   # override retry count
-#   scripts/smoke-probe-8os.sh --json          # emit machine-readable JSON for the agent
+#   scripts/smoke-probe-8os.sh                       # default: 2 attempts, base=https://8os.ai
+#   scripts/smoke-probe-8os.sh --attempts 3         # override retry count
+#   scripts/smoke-probe-8os.sh --json                # emit machine-readable JSON for the agent
+#   scripts/smoke-probe-8os.sh --base-url URL        # probe a candidate build, not production
+#   scripts/smoke-probe-8os.sh --skip-orchestrator   # skip api.8os.ai probes (candidate URL is web only)
 #
-# Reference issues: OS-1180 (orig), OS-1192 (rev-5-compatible test patterns), OS-1199 (Location-header audit signal for /api/auth/google)
+# Reference issues: OS-1180 (orig), OS-1192 (rev-5-compatible test patterns),
+# OS-1199 (Location-header audit signal for /api/auth/google), OS-1221
+# (parameterize base URL for pre-deploy gate).
 
 set -u
 set -o pipefail
 
 ATTEMPTS=2
 JSON_MODE=0
-for arg in "$@"; do
-  case "$arg" in
-    --attempts) ATTEMPTS="${2:-2}"; shift 2 ;;
-    --attempts=*) ATTEMPTS="${arg#*=}"; shift ;;
-    --json) JSON_MODE=1; shift ;;
+BASE_URL="https://8os.ai"
+ORCH_BASE_URL="https://api.8os.ai"
+SKIP_ORCHESTRATOR=0
+# Arg parsing uses while+shift (NOT `for arg in "$@"` — that pattern
+# snapshots the args at loop start, so the `shift` inside the loop body
+# is a no-op and a separate value like `--attempts 3` is parsed as
+# `--attempts` then `3` as a free arg, hitting the "unknown arg" branch.
+# This bit me adding --base-url for OS-1221; the same bug already broke
+# `--attempts 3` since 2025 — the script's own --help text advertises
+# the broken form). Using while+shift fixes both.
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --attempts)        ATTEMPTS="${2:?missing value for --attempts}"; shift 2 ;;
+    --attempts=*)      ATTEMPTS="${1#*=}"; shift ;;
+    --json)            JSON_MODE=1; shift ;;
+    --base-url)        BASE_URL="${2:?missing value for --base-url}"; shift 2 ;;
+    --base-url=*)      BASE_URL="${1#*=}"; shift ;;
+    --skip-orchestrator) SKIP_ORCHESTRATOR=1; shift ;;
     -h|--help)
-      sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'
+      sed -n '2,32p' "$0" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
-    *) echo "unknown arg: $arg" >&2; exit 2 ;;
+    *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
 done
+
+# Strip trailing slash from BASE_URL so concatenations like
+# "$BASE_URL/coming-soon" don't end up with a double slash. Vercel
+# candidate URLs (https://dpl-xxx-username.vercel.app) already have no
+# trailing slash; the production default doesn't either, but be
+# defensive.
+BASE_URL="${BASE_URL%/}"
+ORCH_BASE_URL="${ORCH_BASE_URL%/}"
 
 for bin in curl; do
   if ! command -v "$bin" >/dev/null 2>&1; then
@@ -195,7 +228,7 @@ header_probe() {
 
 # OS-1144: defensive 307 on /api/auth/google when OAuth env vars are missing.
 # A regression here (HTTP 500) silently disables Google sign-in.
-probe "OS-1144 /api/auth/google defensive 307"   GET  https://8os.ai/api/auth/google                 '^307$'
+probe "OS-1144 /api/auth/google defensive 307"   GET  "$BASE_URL/api/auth/google"                 '^307$'
 
 # OS-1199: status code 307 alone is not enough — the Location header must
 # point at Google's consent screen, not our error page. The previous probe
@@ -212,10 +245,16 @@ probe "OS-1144 /api/auth/google defensive 307"   GET  https://8os.ai/api/auth/go
 # GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, and AUTH_FLOW_SECRET on
 # prj_ra28Zh8IoehysZsknj1j7DKbqbBw.
 header_probe "OS-1199 /api/auth/google Location is Google consent" \
-  GET https://8os.ai/api/auth/google Location '^https://accounts\.google\.com/'
+  GET "$BASE_URL/api/auth/google" Location '^https://accounts\.google\.com/'
 
 # OS-1173: coming-soon landing page must serve a 200.
-probe "OS-1173 /coming-soon 200"                 GET  https://8os.ai/coming-soon                     '^200$'
+probe "OS-1173 /coming-soon 200"                 GET  "$BASE_URL/coming-soon"                     '^200$'
+
+# OS-1208: affiliates landing page (parent issue OS-1219 cites this as
+# one of the regression signals — Vex's deploy on alex/os-1137-meta-pixel
+# added /affiliates without /coming-soon, smoke probe caught the gap).
+probe "OS-1208 /affiliates 200"                  GET  "$BASE_URL/affiliates"                      '^200$'
+probe "OS-1208 /affiliates/terms 200"            GET  "$BASE_URL/affiliates/terms"                '^200$'
 
 # OS-1173: waitlist signup proxy. The Vercel 8os-dashboard /api/waitlist
 # proxied to the orchestrator. We assert both the status and the body shape.
@@ -232,18 +271,26 @@ probe "OS-1173 /coming-soon 200"                 GET  https://8os.ai/coming-soon
 # the cached response body from the status probe — fires only ONE POST
 # against the orchestrator's 3/minute rate limit instead of two.
 WAIT_BODY="{\"email\":\"test-alex-1180-smoke-$(date +%s)@paperclip.example\",\"source\":\"smoke-probe\"}"
-probe     "OS-1173 /api/waitlist POST 200"       POST https://8os.ai/api/waitlist                    '^200$' "$WAIT_BODY" "" "waitlist"
-body_probe "OS-1173 /api/waitlist body success:true" POST https://8os.ai/api/waitlist '"success":true' "$WAIT_BODY" "" "waitlist"
+probe     "OS-1173 /api/waitlist POST 200"       POST "$BASE_URL/api/waitlist"                    '^200$' "$WAIT_BODY" "" "waitlist"
+body_probe "OS-1173 /api/waitlist body success:true" POST "$BASE_URL/api/waitlist" '"success":true' "$WAIT_BODY" "" "waitlist"
 
+# Orchestrator-direct probes (api.8os.ai). These hit a separate service
+# from the web-dashboard candidate URL, so they only make sense against
+# production. The pre-deploy gate passes --skip-orchestrator because the
+# candidate URL is the web-dashboard preview — the orchestrator itself
+# is unaffected by a web-dashboard deploy. A regression here would only
+# show up in a separate orchestrator deploy, not a Vercel promotion.
+if (( SKIP_ORCHESTRATOR == 0 )); then
 # OS-1117: orchestrator health — required for any Telegram/waitlist work.
-probe     "OS-1117 /api/health 200"              GET  https://api.8os.ai/health                      '^200$'
-body_probe "OS-1117 /api/health body database:ok"  GET  https://api.8os.ai/health                   '"database":"ok"' ""
-body_probe "OS-1117 /api/health body redis:ok"     GET  https://api.8os.ai/health                   '"redis":"ok"' ""
+probe     "OS-1117 /api/health 200"              GET  "$ORCH_BASE_URL/health"                      '^200$'
+body_probe "OS-1117 /api/health body database:ok"  GET  "$ORCH_BASE_URL/health"                   '"database":"ok"' ""
+body_probe "OS-1117 /api/health body redis:ok"     GET  "$ORCH_BASE_URL/health"                   '"redis":"ok"' ""
 
 # OS-1117: Telegram webhook. We want a non-200 (405/401/403/404) to prove
 # the route is actually wired and rejecting, NOT a default 200.
-probe "OS-1117 /telegram/webhook GET non-200"   GET  https://api.8os.ai/telegram/webhook             '^(40[145]|404)$'
-probe "OS-1117 /telegram/webhook POST 401"      POST https://api.8os.ai/telegram/webhook             '^401$' '{}'
+probe "OS-1117 /telegram/webhook GET non-200"   GET  "$ORCH_BASE_URL/telegram/webhook"             '^(40[145]|404)$'
+probe "OS-1117 /telegram/webhook POST 401"      POST "$ORCH_BASE_URL/telegram/webhook"             '^401$' '{}'
+fi
 
 # OS-1092: web-dashboard DELETE /api/waitlist proxy. Two assertions:
 #  1) Unauthenticated DELETE -> 401 (proves the admin-auth gate is wired
@@ -259,8 +306,8 @@ probe "OS-1117 /telegram/webhook POST 401"      POST https://api.8os.ai/telegram
 # `vercel deploy` lands, the assertions will tighten to 401 + 400.
 # Use a definitely-not-real id ("notanint") so a misbehaving proxy
 # can't accidentally mutate real data.
-probe "OS-1092 /api/waitlist DELETE 401 (no auth)" DELETE https://8os.ai/api/waitlist?id=1              '^(40[15])$'
-probe "OS-1092 /api/waitlist DELETE 400 (bad id)"  DELETE https://8os.ai/api/waitlist?id=notanint      '^(40[05])$'
+probe "OS-1092 /api/waitlist DELETE 401 (no auth)" DELETE "$BASE_URL/api/waitlist?id=1"              '^(40[15])$'
+probe "OS-1092 /api/waitlist DELETE 400 (bad id)"  DELETE "$BASE_URL/api/waitlist?id=notanint"      '^(40[05])$'
 
 # --- Output ----------------------------------------------------------------
 
@@ -277,7 +324,7 @@ if (( JSON_MODE == 1 )); then
   done
   printf ']}\n'
 else
-  echo "8os smoke probe (attempts=$ATTEMPTS, $(date -u +%Y-%m-%dT%H:%M:%SZ))"
+  echo "8os smoke probe (base=$BASE_URL, attempts=$ATTEMPTS, $(date -u +%Y-%m-%dT%H:%M:%SZ))"
   echo "---------------------------------------------------------------"
   for r in "${RESULTS[@]}"; do
     case "${r%% *}" in
