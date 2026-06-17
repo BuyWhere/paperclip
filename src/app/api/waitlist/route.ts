@@ -188,3 +188,68 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ count: 0, entries: [] }, { status: 200 });
   }
 }
+
+// OS-1092: forward DELETE /waitlist?id=<entry_id> to the FastAPI
+// orchestrator's DELETE /waitlist/entry/{entry_id}. The orchestrator route
+// was added in commit a8b0856 and is live on api.8os.ai; the web-dashboard
+// proxy was the missing piece. Used by Mira to scrub the two heidi-formtest*
+// test rows stuck in production (see [OS-1092]) and for GDPR right-to-erasure.
+//
+// Auth: same ADMIN_SECRET as GET, but the orchestrator expects an x-api-key
+// header. We re-use ADMIN_SECRET for both sides — the orchestrator is
+// configured to accept ADMIN_SECRET as a valid API key.
+export async function DELETE(request: NextRequest) {
+  const adminSecret = process.env.ADMIN_SECRET;
+  const authHeader = request.headers.get('authorization');
+
+  if (!adminSecret || authHeader !== `Bearer ${adminSecret}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const entryId = searchParams.get('id') || searchParams.get('entry_id');
+  if (!entryId) {
+    return NextResponse.json(
+      { error: 'Missing required query param: id' },
+      { status: 400 }
+    );
+  }
+  // Defensive: the orchestrator rejects ids that aren't positive integers
+  // with 422. Mirror that here so the form shows a clean 400 instead of
+  // a raw upstream error body.
+  if (!/^[1-9][0-9]*$/.test(entryId)) {
+    return NextResponse.json(
+      { error: 'Invalid entry id (must be a positive integer)' },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const r = await fetch(`${ORCHESTRATOR_URL}/waitlist/entry/${entryId}`, {
+      method: 'DELETE',
+      headers: { 'x-api-key': adminSecret },
+      cache: 'no-store',
+    });
+    if (r.status === 404) {
+      return NextResponse.json(
+        { error: 'Entry not found' },
+        { status: 404 }
+      );
+    }
+    if (!r.ok) {
+      const detail = await r.text().catch(() => '');
+      console.error('Orchestrator DELETE /waitlist/entry error:', r.status, detail);
+      return NextResponse.json(
+        { error: 'Failed to delete waitlist entry' },
+        { status: 502 }
+      );
+    }
+    return NextResponse.json({ success: true, deleted: entryId });
+  } catch (err) {
+    console.error('Waitlist proxy DELETE error:', err);
+    return NextResponse.json(
+      { error: 'Upstream waitlist service unavailable' },
+      { status: 502 }
+    );
+  }
+}
