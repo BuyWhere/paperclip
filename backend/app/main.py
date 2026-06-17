@@ -61,6 +61,7 @@ from app.services import (
 )
 from app.email import send_early_access_email
 from app.routers import telegram as telegram_router
+from app.resend_client import add_contact_to_audience, is_audience_push_enabled
 
 
 settings = get_settings()
@@ -361,6 +362,20 @@ async def join_waitlist(
     await db.refresh(entry)
     position = await get_waitlist_count(db)
     total = position
+
+    # OS-1176: fire-and-forget Resend audience push. Never raises; never
+    # blocks the response. Skipped cleanly when RESEND_AUDIENCE_PUSH_ENABLED
+    # is false (the default). Lets Mira's outreach flow stay in sync with
+    # /coming-soon capture without coupling the waitlist join response to
+    # the Resend API.
+    if is_audience_push_enabled():
+        import asyncio
+        asyncio.create_task(add_contact_to_audience(
+            email=entry.email,
+            archetype=entry.archetype,
+            affiliate_opt_in=bool(entry.affiliate_opt_in),
+        ))
+
     return WaitlistJoinResponse(
         success=True,
         message="Successfully joined waitlist",
@@ -412,6 +427,64 @@ async def send_early_access(
         "failed": failed_count,
         "remaining": len(entries) - sent_count,
     }
+
+
+# ---------------------------------------------------------------------------
+# OS-1176: Resend wire admin routes
+# ---------------------------------------------------------------------------
+from pydantic import BaseModel as _BaseModel
+
+
+class WaitlistResyncResponse(_BaseModel):
+    """OS-1176 admin resync summary."""
+    pushed: int
+    skipped: int
+    failed: int
+    audience_push_enabled: bool
+
+
+@app.post(
+    "/admin/waitlist/resync",
+    response_model=WaitlistResyncResponse,
+    dependencies=[Depends(require_admin)],
+)
+async def resync_waitlist_to_resend(
+    db: AsyncSession = Depends(get_db_session),
+) -> WaitlistResyncResponse:
+    """Push every existing waitlist entry to the Resend Audience.
+
+    Used after the Resend wire goes live to backfill the audience with the
+    historical signups (27+ as of OS-1173 launch). Always available to
+    admin, but the actual push is a no-op when `is_audience_push_enabled`
+    is false (so the operator can sanity-check the route before enabling
+    the flag).
+    """
+    entries = await get_waitlist_entries(db)
+    pushed = 0
+    skipped = 0
+    failed = 0
+    enabled = is_audience_push_enabled()
+
+    for entry in entries:
+        if not enabled:
+            skipped += 1
+            continue
+        ok = await add_contact_to_audience(
+            email=entry.email,
+            archetype=entry.archetype,
+            affiliate_opt_in=bool(entry.affiliate_opt_in),
+        )
+        if ok:
+            pushed += 1
+        else:
+            failed += 1
+
+    return WaitlistResyncResponse(
+        pushed=pushed,
+        skipped=skipped,
+        failed=failed,
+        audience_push_enabled=enabled,
+    )
 
 
 # ---------------------------------------------------------------------------
