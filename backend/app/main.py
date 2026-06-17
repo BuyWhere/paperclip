@@ -36,6 +36,7 @@ from app.schemas import (
     TokenResponse,
     UserResponse,
     VerifyRequest,
+    WaitlistDeleteResponse,
     WaitlistEntryResponse,
     WaitlistJoinRequest,
     WaitlistJoinResponse,
@@ -47,6 +48,7 @@ from app.services import (
     consume_apple_otc,
     create_apple_otc,
     create_user,
+    delete_waitlist_entry,
     get_or_create_apple_user,
     get_or_create_referral_code,
     get_user_by_email,
@@ -404,6 +406,34 @@ async def get_waitlist_stats(
             for e in entries
         ],
     )
+
+
+# OS-1237: GDPR right-to-erasure. Restores the endpoint that the OS-1176
+# wire-code deploy (b75215d0) dropped when it cherry-picked onto the
+# /telegram/webhook lineage. The web-dashboard proxy
+# (src/app/api/waitlist/route.ts DELETE handler) forwards to this route
+# with x-api-key: <ADMIN_API_KEY>; the require_admin dependency checks
+# the same key. Idempotent in the end-state sense: a second call on the
+# same id returns 404 (the row is already gone, which is what the caller
+# wanted). Mirrors the canonical e08031a9 implementation and the
+# original 7256eb7 commit (live at 41dda16c before the wire-code deploy).
+@app.delete("/waitlist/entry/{entry_id}", response_model=WaitlistDeleteResponse, dependencies=[Depends(require_admin)])
+async def delete_waitlist_entry_endpoint(
+    entry_id: str,
+    db: AsyncSession = Depends(get_db_session),
+) -> WaitlistDeleteResponse:
+    """Delete a single waitlist entry by id. OS-1237.
+
+    Returns 200 on success, 404 if the entry does not exist. Admin-only.
+    Used for GDPR right-to-erasure and test-row cleanup.
+    """
+    deleted = await delete_waitlist_entry(db, entry_id)
+    if deleted is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Waitlist entry {entry_id} not found",
+        )
+    return WaitlistDeleteResponse(deleted=True, id=str(deleted.id))
 
 
 @app.post("/waitlist/send-early-access", dependencies=[Depends(require_admin)])

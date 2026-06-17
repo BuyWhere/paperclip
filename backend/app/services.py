@@ -135,6 +135,21 @@ async def mark_early_access_sent(session: AsyncSession, entry_id: "uuid.UUID") -
         await session.commit()
 
 
+# OS-1237: GDPR right-to-erasure + Mira's test-row scrub. The web-dashboard
+# proxy (src/app/api/waitlist/route.ts DELETE handler) forwards to this
+# function via the orchestrator route. Returns the deleted entry, or
+# None if the row didn't exist — the route layer translates None into
+# 404. Idempotent in the end-state sense: calling twice always leaves
+# the entry gone.
+async def delete_waitlist_entry(session: AsyncSession, entry_id: str) -> "WaitlistEntry | None":
+    entry = await session.get(WaitlistEntry, entry_id)
+    if entry is None:
+        return None
+    await session.delete(entry)
+    await session.commit()
+    return entry
+
+
 # ---------------------------------------------------------------------------
 # Referral services
 # ---------------------------------------------------------------------------

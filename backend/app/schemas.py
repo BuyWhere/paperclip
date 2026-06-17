@@ -79,6 +79,18 @@ class WaitlistStatsResponse(BaseModel):
     entries: list[WaitlistEntryResponse]
 
 
+class WaitlistDeleteResponse(BaseModel):
+    """Return value for DELETE /waitlist/entry/{id} (OS-1237 / OS-1092).
+
+    Matches the original 7256eb7 implementation that was live at 41dda16c
+    before the OS-1176 wire-code deploy dropped it. The web-dashboard
+    proxy ignores the body on success and just relays the entry id from
+    the URL, so this shape is informational for admin tooling.
+    """
+    deleted: bool
+    id: str
+
+
 # ---------------------------------------------------------------------------
 # Referral schemas
 # ---------------------------------------------------------------------------
