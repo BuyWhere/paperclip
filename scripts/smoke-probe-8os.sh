@@ -256,6 +256,41 @@ probe "OS-1173 /coming-soon 200"                 GET  "$BASE_URL/coming-soon"   
 probe "OS-1208 /affiliates 200"                  GET  "$BASE_URL/affiliates"                      '^200$'
 probe "OS-1208 /affiliates/terms 200"            GET  "$BASE_URL/affiliates/terms"                '^200$'
 
+# OS-1254: i18n hreflang alternates (/en, /zh), registration entry point
+# (/register), the signup page it chains into (/signup), and favicon.
+# These are part of the static-routes contract that OS-1055 (register)
+# and OS-1057 (i18n + favicon) originally shipped. A status-only probe
+# accepts 307 with no Location header — the OS-1253 regression class
+# (commit 1c1ab9ff at 14:25Z / OS-1246 caused /en /zh /register to
+# return 307 with a cached __next_error__ body and no Location header).
+# Pairing the status probe with a header_probe catches the regression
+# the same way OS-1199 catches the /api/auth/google Location miss.
+#
+# Expected Locations when working:
+#   /en        → /          (default-locale redirect; hreflang content
+#                            lives at root, not /en or /zh)
+#   /zh        → /
+#   /register  → /signup    (entry point into the signup flow)
+#   /signup    → 200        (page itself; chain target must resolve,
+#                            not loop into another 307)
+#   /favicon.ico → 200      (browsers expect it; absence shows up as
+#                            a console 404 on every page-load)
+#
+# Location regexes are anchored at start, not end, so an absolute URL
+# like "https://8os.ai/signup" (Vercel sometimes rewrites relative
+# paths to absolute in the redirect chain) still matches '^/signup'.
+probe     "OS-1254 /en 307"                      GET  "$BASE_URL/en"                              '^307$'
+header_probe "OS-1254 /en Location is /"         GET  "$BASE_URL/en"                              Location '^/$'
+
+probe     "OS-1254 /zh 307"                      GET  "$BASE_URL/zh"                              '^307$'
+header_probe "OS-1254 /zh Location is /"         GET  "$BASE_URL/zh"                              Location '^/$'
+
+probe     "OS-1254 /register 307"                GET  "$BASE_URL/register"                        '^307$'
+header_probe "OS-1254 /register Location is /signup" GET  "$BASE_URL/register"                   Location '^/signup'
+
+probe     "OS-1254 /signup 200"                  GET  "$BASE_URL/signup"                          '^200$'
+probe     "OS-1254 /favicon.ico 200"             GET  "$BASE_URL/favicon.ico"                     '^200$'
+
 # OS-1173: waitlist signup proxy. The Vercel 8os-dashboard /api/waitlist
 # proxied to the orchestrator. We assert both the status and the body shape.
 #
