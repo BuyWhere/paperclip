@@ -77,6 +77,20 @@ class Settings(BaseSettings):
     smtp_from: str = Field(default="noreply@8os.com", validation_alias="SMTP_FROM")
     early_access_url: str = Field(default="http://localhost:3000/onboarding", validation_alias="EARLY_ACCESS_URL")
 
+    # OS-1176: Resend wire. All env vars are optional — when RESEND_API_KEY is
+    # unset, the audience push + email send paths fail soft (no-op + log).
+    # Setting RESEND_API_KEY alone does NOT enable audience push: the
+    # separate RESEND_AUDIENCE_PUSH_ENABLED flag must be flipped to "true" by
+    # the operator (separates deploy from rollout).
+    resend_api_key: str | None = Field(default=None, validation_alias="RESEND_API_KEY")
+    resend_audience_id: str | None = Field(default=None, validation_alias="RESEND_AUDIENCE_ID")
+    resend_from_email: str = Field(default="noreply@8os.ai", validation_alias="RESEND_FROM_EMAIL")
+    resend_from_name: str = Field(default="8OS", validation_alias="RESEND_FROM_NAME")
+    resend_audience_push_enabled: bool = Field(
+        default=False,
+        validation_alias="RESEND_AUDIENCE_PUSH_ENABLED",
+    )
+
     # Admin
     admin_api_key: str | None = Field(default=None, validation_alias=AliasChoices("ADMIN_API_KEY"))
 

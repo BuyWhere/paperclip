@@ -29,7 +29,7 @@
 #
 # Reference issues: OS-1180 (orig), OS-1192 (rev-5-compatible test patterns),
 # OS-1199 (Location-header audit signal for /api/auth/google), OS-1221
-# (parameterize base URL for pre-deploy gate).
+# (parameterize base URL for pre-deploy gate), OS-1176 (Resend wire).
 
 set -u
 set -o pipefail
@@ -308,6 +308,13 @@ fi
 # can't accidentally mutate real data.
 probe "OS-1092 /api/waitlist DELETE 401 (no auth)" DELETE "$BASE_URL/api/waitlist?id=1"              '^(40[15])$'
 probe "OS-1092 /api/waitlist DELETE 400 (bad id)"  DELETE "$BASE_URL/api/waitlist?id=notanint"      '^(40[05])$'
+
+# OS-1176: Resend wire. The /admin/waitlist/resync route proves the new
+# endpoint is registered AND admin-gated. Pre-deploy (wire not yet shipped):
+# the route is unknown, so we accept 404 OR 401 OR 503. Post-deploy: the
+# route must be admin-gated, so 401 (no x-api-key) or 503 (admin_api_key
+# not configured in env). Accepts all three until the wire is live.
+probe "OS-1176 /admin/waitlist/resync 401 (no auth)" POST "$ORCH_BASE_URL/admin/waitlist/resync"     '^(40[15]|404|503)$' '{}'
 
 # --- Output ----------------------------------------------------------------
 
