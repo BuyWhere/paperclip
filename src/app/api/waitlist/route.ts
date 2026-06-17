@@ -191,9 +191,10 @@ export async function GET(request: NextRequest) {
 
 // OS-1092: forward DELETE /waitlist?id=<entry_id> to the FastAPI
 // orchestrator's DELETE /waitlist/entry/{entry_id}. The orchestrator route
-// was added in commit a8b0856 and is live on api.8os.ai; the web-dashboard
-// proxy was the missing piece. Used by Mira to scrub the two heidi-formtest*
-// test rows stuck in production (see [OS-1092]) and for GDPR right-to-erasure.
+// was originally added in commit 7256eb7 (live at 41dda16c before the
+// OS-1176 wire-code deploy dropped it) and is being restored in OS-1237.
+// Used by Mira to scrub the two heidi-formtest* test rows stuck in
+// production (see [OS-1092]) and for GDPR right-to-erasure.
 //
 // Auth: same ADMIN_SECRET as GET, but the orchestrator expects an x-api-key
 // header. We re-use ADMIN_SECRET for both sides — the orchestrator is
@@ -214,12 +215,15 @@ export async function DELETE(request: NextRequest) {
       { status: 400 }
     );
   }
-  // Defensive: the orchestrator rejects ids that aren't positive integers
-  // with 422. Mirror that here so the form shows a clean 400 instead of
-  // a raw upstream error body.
-  if (!/^[1-9][0-9]*$/.test(entryId)) {
+  // OS-1237: the orchestrator's waitlist_entries.id is a UUID (String(36)),
+  // not a positive integer — the previous regex `^[1-9][0-9]*$` rejected
+  // every real entry id and 400'd the form before it could ever reach
+  // the orchestrator. Accept any non-empty alphanumeric/hyphen id up to
+  // 64 chars; the orchestrator returns 404 cleanly for anything that
+  // doesn't exist in the table.
+  if (!/^[A-Za-z0-9-]{1,64}$/.test(entryId)) {
     return NextResponse.json(
-      { error: 'Invalid entry id (must be a positive integer)' },
+      { error: 'Invalid entry id (must be a non-empty alphanumeric string up to 64 chars)' },
       { status: 400 }
     );
   }
