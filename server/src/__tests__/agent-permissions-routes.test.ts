@@ -558,6 +558,21 @@ describe.sequential("agent permission routes", () => {
       ...baseAgent,
       adapterType: "codex_local",
     });
+    mockAgentService.update.mockImplementation(async (_id, _patch, options) => {
+      // Simulate the real agentService.update behavior: it is the service that
+      // emits the activity row, not the route. The route must NOT call
+      // logActivity directly for the generic PATCH `/agents/:id` path so we
+      // avoid double-logging.
+      await mockLogActivity({} as any, {
+        action: "agent.updated",
+        entityId: baseAgent.id,
+        entityType: "agent",
+        companyId: baseAgent.companyId,
+        actorType: (options as { actor?: { actorType: string } } | undefined)?.actor?.actorType ?? "user",
+        actorId: (options as { actor?: { actorId: string } } | undefined)?.actor?.actorId ?? "board-user",
+      });
+      return baseAgent;
+    });
 
     const app = await createApp({
       type: "board",
@@ -588,8 +603,14 @@ describe.sequential("agent permission routes", () => {
     expect(mockAgentService.update).toHaveBeenCalledWith(
       agentId,
       expect.objectContaining({ runtimeConfig }),
-      expect.anything(),
+      expect.objectContaining({
+        actor: expect.objectContaining({
+          actorType: "user",
+          actorId: "board-user",
+        }),
+      }),
     );
+    expect(mockLogActivity).toHaveBeenCalledTimes(1);
     expect(mockLogActivity).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       action: "agent.updated",
     }));
@@ -670,6 +691,60 @@ describe.sequential("agent permission routes", () => {
         },
       }),
       expect.anything(),
+    );
+  });
+
+  it("translates legacy adapterConfig.cheapModel patches into runtimeConfig.modelProfiles.cheap", async () => {
+    mockAgentService.getById.mockResolvedValue({
+      ...baseAgent,
+      adapterType: "codex_local",
+      adapterConfig: {
+        model: "gpt-5.4",
+        cheapModel: "GPT-5.3-Codex-Spark",
+        dangerouslyBypassApprovalsAndSandbox: true,
+      },
+      runtimeConfig: {},
+    });
+    mockSecretService.normalizeAdapterConfigForPersistence.mockImplementation(async (_companyId, config) => config);
+
+    const app = await createApp({
+      type: "agent",
+      agentId,
+      companyId,
+      source: "agent_key",
+      runId: "run-1",
+    });
+
+    const res = await requestApp(app, (baseUrl) => request(baseUrl)
+      .patch(`/api/agents/${agentId}`)
+      .send({
+        adapterConfig: {
+          cheapModel: "gpt-5.4",
+        },
+      }));
+
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(mockAgentService.update).toHaveBeenCalledWith(
+      agentId,
+      expect.objectContaining({
+        adapterConfig: {
+          model: "gpt-5.4",
+          dangerouslyBypassApprovalsAndSandbox: true,
+        },
+        runtimeConfig: {
+          modelProfiles: {
+            cheap: {
+              enabled: true,
+              adapterConfig: {
+                model: "gpt-5.4",
+              },
+            },
+          },
+        },
+      }),
+      expect.objectContaining({
+        allowLegacyCheapModelCleanup: true,
+      }),
     );
   });
 

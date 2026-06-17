@@ -756,6 +756,89 @@ export function agentRoutes(
     return Object.hasOwn(value, key);
   }
 
+  function mergeLegacyCheapModelPatch(input: {
+    existingAdapterConfig: Record<string, unknown>;
+    existingRuntimeConfig: Record<string, unknown>;
+    requestedAdapterConfig: Record<string, unknown>;
+    requestedRuntimeConfig: Record<string, unknown> | null;
+  }): {
+    adapterConfig: Record<string, unknown>;
+    runtimeConfig: Record<string, unknown>;
+    shouldReplaceAdapterConfig: boolean;
+    allowLegacyCheapModelCleanup: boolean;
+  } | null {
+    if (!hasOwn(input.requestedAdapterConfig, "cheapModel")) return null;
+
+    const requestedLegacyValue = input.requestedAdapterConfig.cheapModel;
+    const normalizedLegacyModel = typeof requestedLegacyValue === "string"
+      ? requestedLegacyValue.trim()
+      : "";
+
+    const requestedAdapterConfig = { ...input.requestedAdapterConfig };
+    delete requestedAdapterConfig.cheapModel;
+
+    const nextAdapterConfig = {
+      ...input.existingAdapterConfig,
+      ...requestedAdapterConfig,
+    };
+    delete nextAdapterConfig.cheapModel;
+
+    const runtimeConfig = {
+      ...(input.requestedRuntimeConfig ?? input.existingRuntimeConfig),
+    };
+    const existingModelProfiles = asRecord(runtimeConfig.modelProfiles) ?? {};
+    const nextModelProfiles = { ...existingModelProfiles };
+    const existingCheapProfile = asRecord(existingModelProfiles.cheap) ?? {};
+    const existingCheapAdapterConfig = asRecord(existingCheapProfile.adapterConfig) ?? {};
+
+    if (normalizedLegacyModel) {
+      nextModelProfiles.cheap = {
+        ...existingCheapProfile,
+        enabled: existingCheapProfile.enabled !== false,
+        adapterConfig: {
+          ...existingCheapAdapterConfig,
+          model: normalizedLegacyModel,
+        },
+      };
+    } else {
+      const nextCheapAdapterConfig = { ...existingCheapAdapterConfig };
+      delete nextCheapAdapterConfig.model;
+      if (Object.keys(nextCheapAdapterConfig).length === 0 && Object.keys(existingCheapProfile).length === 0) {
+        delete nextModelProfiles.cheap;
+      } else if (Object.keys(nextCheapAdapterConfig).length === 0 && Object.keys(existingCheapProfile).length <= 1) {
+        delete nextModelProfiles.cheap;
+      } else {
+        nextModelProfiles.cheap = {
+          ...existingCheapProfile,
+          adapterConfig: nextCheapAdapterConfig,
+        };
+      }
+    }
+
+    if (Object.keys(nextModelProfiles).length === 0) {
+      delete runtimeConfig.modelProfiles;
+    } else {
+      runtimeConfig.modelProfiles = nextModelProfiles;
+    }
+
+    const existingPrimaryModel = typeof input.existingAdapterConfig.model === "string"
+      ? input.existingAdapterConfig.model.trim()
+      : "";
+    const nextPrimaryModel = typeof nextAdapterConfig.model === "string"
+      ? nextAdapterConfig.model.trim()
+      : "";
+    const allowLegacyCheapModelCleanup =
+      hasOwn(input.existingAdapterConfig, "cheapModel") &&
+      existingPrimaryModel === nextPrimaryModel;
+
+    return {
+      adapterConfig: nextAdapterConfig,
+      runtimeConfig,
+      shouldReplaceAdapterConfig: true,
+      allowLegacyCheapModelCleanup,
+    };
+  }
+
   function allowedEnvironmentDriversForAgent(adapterType: string): string[] {
     return supportedEnvironmentDriversForAdapter(adapterType);
   }
@@ -1104,7 +1187,7 @@ export function agentRoutes(
       delete nextAdapterConfig.bootstrapPromptTemplate;
       if (!hadLegacyPrompt) return agent;
 
-      const updated = await svc.update(agent.id, { adapterConfig: nextAdapterConfig });
+      const updated = await svc.update(agent.id, { adapterConfig: nextAdapterConfig }, { logActivity: false });
       return (updated as T | null) ?? { ...agent, adapterConfig: nextAdapterConfig };
     }
 
@@ -1119,7 +1202,7 @@ export function agentRoutes(
     delete nextAdapterConfig.promptTemplate;
     delete nextAdapterConfig.bootstrapPromptTemplate;
 
-    const updated = await svc.update(agent.id, { adapterConfig: nextAdapterConfig });
+    const updated = await svc.update(agent.id, { adapterConfig: nextAdapterConfig }, { logActivity: false });
     return (updated as T | null) ?? { ...agent, adapterConfig: nextAdapterConfig };
   }
 
@@ -1553,6 +1636,7 @@ export function agentRoutes(
           createdByUserId: actor.actorType === "user" ? actor.actorId : null,
           source: "skill-sync",
         },
+        logActivity: false,
       });
       if (!updated) {
         res.status(404).json({ error: "Agent not found" });
@@ -2368,6 +2452,7 @@ export function agentRoutes(
           createdByUserId: actor.actorType === "user" ? actor.actorId : null,
           source: "instructions_path_patch",
         },
+        logActivity: false,
       },
     );
     if (!agent) {
@@ -2438,6 +2523,7 @@ export function agentRoutes(
           createdByUserId: actor.actorType === "user" ? actor.actorId : null,
           source: "instructions_bundle_patch",
         },
+        logActivity: false,
       },
     );
 
@@ -2506,6 +2592,7 @@ export function agentRoutes(
           createdByUserId: actor.actorType === "user" ? actor.actorId : null,
           source: "instructions_bundle_file_put",
         },
+        logActivity: false,
       },
     );
 
@@ -2577,8 +2664,7 @@ export function agentRoutes(
     }
 
     const patchData = { ...(req.body as Record<string, unknown>) };
-    const replaceAdapterConfig = patchData.replaceAdapterConfig === true;
-    delete patchData.replaceAdapterConfig;
+    let allowLegacyCheapModelCleanup = false;
     if (hasOwn(patchData, "adapterConfig")) {
       const adapterConfig = asRecord(patchData.adapterConfig);
       if (!adapterConfig) {
@@ -2606,11 +2692,29 @@ export function agentRoutes(
       assertNoAgentRuntimeConfigAdapterConfigMutation(req, runtimeConfig);
       requestedRuntimeConfig = runtimeConfig;
     }
+    const existingAdapterConfig = asRecord(existing.adapterConfig) ?? {};
+    const existingRuntimeConfig = asRecord(existing.runtimeConfig) ?? {};
+    if (hasOwn(patchData, "adapterConfig")) {
+      const legacyCheapModelPatch = mergeLegacyCheapModelPatch({
+        existingAdapterConfig,
+        existingRuntimeConfig,
+        requestedAdapterConfig: (asRecord(patchData.adapterConfig) ?? {}),
+        requestedRuntimeConfig,
+      });
+      if (legacyCheapModelPatch) {
+        patchData.adapterConfig = legacyCheapModelPatch.adapterConfig;
+        patchData.runtimeConfig = legacyCheapModelPatch.runtimeConfig;
+        patchData.replaceAdapterConfig = legacyCheapModelPatch.shouldReplaceAdapterConfig;
+        requestedRuntimeConfig = legacyCheapModelPatch.runtimeConfig;
+        allowLegacyCheapModelCleanup = legacyCheapModelPatch.allowLegacyCheapModelCleanup;
+      }
+    }
+    const replaceAdapterConfig = patchData.replaceAdapterConfig === true;
+    delete patchData.replaceAdapterConfig;
     const touchesAdapterConfiguration =
       hasOwn(patchData, "adapterType") ||
       hasOwn(patchData, "adapterConfig");
     if (touchesAdapterConfiguration) {
-      const existingAdapterConfig = asRecord(existing.adapterConfig) ?? {};
       const changingAdapterType =
         typeof patchData.adapterType === "string" && patchData.adapterType !== existing.adapterType;
       const requestedAdapterConfig = hasOwn(patchData, "adapterConfig")
@@ -2698,6 +2802,13 @@ export function agentRoutes(
         createdByUserId: actor.actorType === "user" ? actor.actorId : null,
         source: "patch",
       },
+      actor: {
+        actorType: actor.actorType,
+        actorId: actor.actorId,
+        agentId: actor.agentId,
+        runId: actor.runId,
+      },
+      allowLegacyCheapModelCleanup,
     });
     if (!agent) {
       res.status(404).json({ error: "Agent not found" });
@@ -2711,18 +2822,6 @@ export function agentRoutes(
         agentEnv,
       );
     }
-
-    await logActivity(db, {
-      companyId: agent.companyId,
-      actorType: actor.actorType,
-      actorId: actor.actorId,
-      agentId: actor.agentId,
-      runId: actor.runId,
-      action: "agent.updated",
-      entityType: "agent",
-      entityId: agent.id,
-      details: summarizeAgentUpdateDetails(patchData),
-    });
 
     res.json(agent);
   });

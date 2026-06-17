@@ -19,6 +19,7 @@ import {
 import { AGENT_DEFAULT_MAX_CONCURRENT_RUNS, isUuidLike, normalizeAgentUrlKey } from "@paperclipai/shared";
 import { conflict, notFound, unprocessable } from "../errors.js";
 import { normalizeAgentPermissions } from "./agent-permissions.js";
+import { logActivity, type LogActivityInput } from "./activity-log.js";
 import { REDACTED_EVENT_VALUE, sanitizeRecord } from "../redaction.js";
 
 function hashToken(token: string) {
@@ -53,8 +54,33 @@ interface RevisionMetadata {
   rolledBackFromRevisionId?: string | null;
 }
 
+export type UpdateAgentActor = {
+  actorType: LogActivityInput["actorType"];
+  actorId: string;
+  agentId?: string | null;
+  runId?: string | null;
+};
+
+export type UpdateAgentLogActivity =
+  | false
+  | { action?: string; details?: Record<string, unknown> | null };
+
 interface UpdateAgentOptions {
   recordRevision?: RevisionMetadata;
+  /**
+   * Actor context used to write the auto-emitted `agent.updated` activity log.
+   * Required for the default log behavior; pass `logActivity: false` to skip
+   * the log entirely, or `logActivity: { action, details }` to override the
+   * default action/details (action defaults to `"agent.updated"`).
+   */
+  actor?: UpdateAgentActor;
+  logActivity?: UpdateAgentLogActivity;
+  /**
+   * Allows a tightly scoped transaction-local bypass for the legacy
+   * `adapterConfig.cheapModel` cleanup path. This must never be used for
+   * general model changes.
+   */
+  allowLegacyCheapModelCleanup?: boolean;
 }
 
 interface AgentShortnameRow {
@@ -114,6 +140,64 @@ function containsRedactedMarker(value: unknown): boolean {
 
 function hasConfigPatchFields(data: Partial<typeof agents.$inferInsert>) {
   return CONFIG_REVISION_FIELDS.some((field) => Object.prototype.hasOwnProperty.call(data, field));
+}
+
+export function summarizeAgentUpdateDetails(patch: Record<string, unknown>) {
+  const changedTopLevelKeys = Object.keys(patch).sort();
+  const details: Record<string, unknown> = { changedTopLevelKeys };
+
+  const adapterConfigPatch = isPlainRecord(patch.adapterConfig)
+    ? patch.adapterConfig
+    : null;
+  if (adapterConfigPatch) {
+    details.changedAdapterConfigKeys = Object.keys(adapterConfigPatch).sort();
+  }
+
+  const runtimeConfigPatch = isPlainRecord(patch.runtimeConfig)
+    ? patch.runtimeConfig
+    : null;
+  if (runtimeConfigPatch) {
+    details.changedRuntimeConfigKeys = Object.keys(runtimeConfigPatch).sort();
+  }
+
+  return details;
+}
+
+function deriveActorFromRevision(
+  recordRevision: RevisionMetadata | undefined,
+): UpdateAgentActor | null {
+  if (!recordRevision) return null;
+  if (recordRevision.createdByUserId) {
+    return {
+      actorType: "user",
+      actorId: recordRevision.createdByUserId,
+      agentId: recordRevision.createdByAgentId ?? null,
+    };
+  }
+  if (recordRevision.createdByAgentId) {
+    return {
+      actorType: "agent",
+      actorId: recordRevision.createdByAgentId,
+      agentId: recordRevision.createdByAgentId,
+    };
+  }
+  return null;
+}
+
+function readModelChangeBlockedMessage(error: unknown): string | null {
+  const candidate = error instanceof Error ? error : null;
+  const message = candidate?.message?.trim() ?? "";
+  const prefix = "MODEL_CHANGE_BLOCKED:";
+  if (message.startsWith(prefix)) {
+    return message.slice(prefix.length).trim();
+  }
+  if (message.includes("MODEL_CHANGE_BLOCKED:")) {
+    return message.split("MODEL_CHANGE_BLOCKED:")[1]?.trim() ?? null;
+  }
+  if (candidate?.cause instanceof Error) {
+    return readModelChangeBlockedMessage(candidate.cause);
+  }
+  return null;
 }
 
 function parseFiniteNumberLike(value: unknown): number | null {
@@ -368,44 +452,84 @@ export function agentService(db: Db) {
     const shouldRecordRevision = Boolean(options?.recordRevision) && hasConfigPatchFields(normalizedPatch);
     const beforeConfig = shouldRecordRevision ? buildConfigSnapshot(existing) : null;
 
-    const updated = await db
-      .update(agents)
-      .set({ ...normalizedPatch, updatedAt: new Date() })
-      .where(eq(agents.id, id))
-      .returning()
-      .then((rows) => rows[0] ?? null);
-    const normalizedUpdated = updated ? normalizeAgentRow(updated) : null;
+    try {
+      return await db.transaction(async (tx) => {
+        if (options?.allowLegacyCheapModelCleanup) {
+          await tx.execute(sql`select set_config('paperclip.allow_model_change', 'true', true)`);
+        }
 
-    if (normalizedUpdated && shouldRecordRevision && beforeConfig) {
-      const afterConfig = buildConfigSnapshot(normalizedUpdated);
-      const changedKeys = diffConfigSnapshot(beforeConfig, afterConfig);
-      if (changedKeys.length > 0) {
-        await db.insert(agentConfigRevisions).values({
-          companyId: normalizedUpdated.companyId,
-          agentId: normalizedUpdated.id,
-          createdByAgentId: options?.recordRevision?.createdByAgentId ?? null,
-          createdByUserId: options?.recordRevision?.createdByUserId ?? null,
-          source: options?.recordRevision?.source ?? "patch",
-          rolledBackFromRevisionId: options?.recordRevision?.rolledBackFromRevisionId ?? null,
-          changedKeys,
-          beforeConfig: beforeConfig as unknown as Record<string, unknown>,
-          afterConfig: afterConfig as unknown as Record<string, unknown>,
-        });
+        const updated = await tx
+          .update(agents)
+          .set({ ...normalizedPatch, updatedAt: new Date() })
+          .where(eq(agents.id, id))
+          .returning()
+          .then((rows) => rows[0] ?? null);
+        const normalizedUpdated = updated ? normalizeAgentRow(updated) : null;
+
+        if (normalizedUpdated && shouldRecordRevision && beforeConfig) {
+          const afterConfig = buildConfigSnapshot(normalizedUpdated);
+          const changedKeys = diffConfigSnapshot(beforeConfig, afterConfig);
+          if (changedKeys.length > 0) {
+            await tx.insert(agentConfigRevisions).values({
+              companyId: normalizedUpdated.companyId,
+              agentId: normalizedUpdated.id,
+              createdByAgentId: options?.recordRevision?.createdByAgentId ?? null,
+              createdByUserId: options?.recordRevision?.createdByUserId ?? null,
+              source: options?.recordRevision?.source ?? "patch",
+              rolledBackFromRevisionId: options?.recordRevision?.rolledBackFromRevisionId ?? null,
+              changedKeys,
+              beforeConfig: beforeConfig as unknown as Record<string, unknown>,
+              afterConfig: afterConfig as unknown as Record<string, unknown>,
+            });
+          }
+        }
+
+        if (normalizedUpdated && options?.logActivity !== false) {
+          const override = options?.logActivity && typeof options.logActivity === "object"
+            ? options.logActivity
+            : null;
+          const actor = options?.actor ?? deriveActorFromRevision(options?.recordRevision);
+          if (actor) {
+            await logActivity(tx as Db, {
+              companyId: normalizedUpdated.companyId,
+              actorType: actor.actorType,
+              actorId: actor.actorId,
+              agentId: actor.agentId ?? null,
+              runId: actor.runId ?? null,
+              action: override?.action ?? "agent.updated",
+              entityType: "agent",
+              entityId: normalizedUpdated.id,
+              details: override?.details ?? summarizeAgentUpdateDetails(data),
+            });
+          }
+        }
+
+        return normalizedUpdated;
+      });
+    } catch (error) {
+      const blockedMessage = readModelChangeBlockedMessage(error);
+      if (blockedMessage) {
+        throw unprocessable(blockedMessage, { code: "model_change_blocked" });
       }
+      throw error;
     }
-
-    return normalizedUpdated;
   }
 
   return {
-    list: async (companyId: string, options?: { includeTerminated?: boolean }) => {
+    list: async (
+      companyId: string,
+      options?: { includeTerminated?: boolean; includeMonthlySpend?: boolean },
+    ) => {
       const conditions = [eq(agents.companyId, companyId)];
       if (!options?.includeTerminated) {
         conditions.push(ne(agents.status, "terminated"));
       }
       const rows = await db.select().from(agents).where(and(...conditions));
-      const hydrated = await hydrateAgentSpend(rows);
-      return hydrated.map(normalizeAgentRow);
+      if (options?.includeMonthlySpend === true) {
+        const hydrated = await hydrateAgentSpend(rows);
+        return hydrated.map(normalizeAgentRow);
+      }
+      return rows.map(normalizeAgentRow);
     },
 
     getById,
