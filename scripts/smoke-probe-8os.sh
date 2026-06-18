@@ -242,6 +242,61 @@ header_probe() {
   return 1
 }
 
+# Bundle probe (asserts a substring is present in a JS chunk referenced
+# from the page HTML). Catches cases where the feature code is a Next.js
+# client component loaded via the layout/page chunk URL — the raw HTML
+# payload does not contain the feature code, so a body_probe against the
+# HTML alone returns false negatives. OS-1137's Meta Pixel is the canonical
+# example: a `grep -oE "fbq|fbevents"` against `8os.ai` HTML returns 0
+# matches even when the pixel is fully wired, because the init code lives
+# in `static/chunks/app/layout-{hash}.js` and is referenced by URL only.
+#
+# Args: name page_url chunk_regex expected_substr
+#   page_url: the page whose HTML contains the chunk URL
+#   chunk_regex: POSIX ERE matching the chunk path under _next/ in the HTML
+#   expected_substr: literal string that must appear in the fetched chunk
+#
+# This is intentionally simpler than body_probe — there's no share-key or
+# retry-on-fail-soft semantics, because the chunk URL extraction is
+# deterministic and a missing chunk is always a real regression.
+bundle_probe() {
+  local name="$1" page_url="$2" chunk_regex="$3" expected_substr="$4"
+  local attempt=1 last_code=000 chunk_path="" chunk_body=""
+  while (( attempt <= ATTEMPTS )); do
+    local html="/tmp/smoke-html.$$"
+    last_code=$(curl -s -m 10 -o "$html" -w "%{http_code}" "$page_url" "${BYPASS_HEADER[@]}" 2>/dev/null || echo "000")
+    chunk_path=$(grep -oE "$chunk_regex" "$html" 2>/dev/null | head -1 || true)
+    rm -f "$html"
+
+    if [[ -z "$chunk_path" ]]; then
+      RESULTS+=("FAIL $name no chunk matched $chunk_regex in $page_url html (http=$last_code)")
+      FAIL_COUNT=$((FAIL_COUNT + 1))
+      return 1
+    fi
+
+    local chunk_url="${page_url%/}/_next/${chunk_path}"
+    chunk_body=$(curl -s -m 10 "$chunk_url" "${BYPASS_HEADER[@]}" 2>/dev/null || echo "")
+
+    if [[ "$chunk_body" == *"$expected_substr"* ]]; then
+      if (( attempt == 1 )); then
+        RESULTS+=("PASS $name bundle contains $expected_substr (chunk=$chunk_path)")
+        PASS_COUNT=$((PASS_COUNT + 1))
+      else
+        RESULTS+=("WARN $name bundle contains $expected_substr on retry $attempt (chunk=$chunk_path)")
+        WARN_COUNT=$((WARN_COUNT + 1))
+        PASS_COUNT=$((PASS_COUNT + 1))
+      fi
+      return 0
+    fi
+    attempt=$((attempt + 1))
+    sleep 1
+  done
+
+  RESULTS+=("FAIL $name bundle missing $expected_substr (chunk=$chunk_path url=$chunk_url)")
+  FAIL_COUNT=$((FAIL_COUNT + 1))
+  return 1
+}
+
 # --- Probes ----------------------------------------------------------------
 
 # OS-1144: defensive 307 on /api/auth/google when OAuth env vars are missing.
@@ -273,6 +328,22 @@ probe "OS-1173 /coming-soon 200"                 GET  "$BASE_URL/coming-soon"   
 # added /affiliates without /coming-soon, smoke probe caught the gap).
 probe "OS-1208 /affiliates 200"                  GET  "$BASE_URL/affiliates"                      '^200$'
 probe "OS-1208 /affiliates/terms 200"            GET  "$BASE_URL/affiliates/terms"                '^200$'
+
+# OS-1137: Meta Pixel bundle presence. The pixel is a Next.js client
+# component wired in src/app/layout.tsx — the init code lives in the
+# layout chunk JS, not the raw HTML payload. Asserting "fbq" in the
+# HTML body is a false negative; we have to fetch the layout chunk and
+# grep that. This probe caught the 08:08Z 2026-06-18 false alarm where
+# a too-narrow HTML grep led to a wrong "regression" report after the
+# 08:02Z CTO unilateral alias swap (the swap DID NOT actually remove
+# the pixel — the bundle still has fbq('init', NEXT_PUBLIC_META_PIXEL_ID)).
+# Until the env var is set, fbq() will fire with undefined; the bundle
+# presence is the right assertion here. The actual firing check
+# (network request to connect.facebook.net/fbevents) requires a real
+# browser and lives in OS-1137's manual verification step.
+bundle_probe "OS-1137 Meta Pixel in layout chunk" \
+  "$BASE_URL/" 'static/chunks/app/layout-[a-f0-9]+\.js' \
+  'fbq'
 
 # OS-1173: waitlist signup proxy. The Vercel 8os-dashboard /api/waitlist
 # proxied to the orchestrator. We assert both the status and the body shape.
