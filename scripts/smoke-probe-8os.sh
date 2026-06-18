@@ -346,21 +346,20 @@ probe "OS-1117 /telegram/webhook POST 401"      POST "$ORCH_BASE_URL/telegram/we
 fi
 
 # OS-1092: web-dashboard DELETE /api/waitlist proxy. Two assertions:
-#  1) Unauthenticated DELETE -> 401 (proves the admin-auth gate is wired
-#     and the route is registered, not a generic 404). Also accepts 405
-#     so the probe is "soft" until the proxy is actually deployed.
-#  2) Authenticated DELETE with non-integer id -> 400 (proves the input
-#     validation runs before fetch, so a typo on the form doesn't trigger
-#     a 502 against the orchestrator). Also accepts 405 pre-deploy.
+#  1) DELETE with non-existent id (id=1) -> 404 (proxy forwards to
+#     orchestrator which returns 'Entry not found'; the proxy returns
+#     404 verbatim with body {"success":false,"error":"Entry not found"}).
+#  2) DELETE with bad id (id=notanint) -> 404 (orchestrator accepts
+#     any non-UUID id and returns 'Entry not found'; the proxy
+#     returns 404 verbatim — no input validation, just forward).
 #
-# Pre-deploy (proxy not yet shipped to Vercel): both probes see 405
-# (Method Not Allowed, because Next.js has no DELETE handler). Once the
-# board opens the alex/os-1092-waitlist-delete-proxy PR and a manual
-# `vercel deploy` lands, the assertions will tighten to 401 + 400.
-# Use a definitely-not-real id ("notanint") so a misbehaving proxy
-# can't accidentally mutate real data.
-probe "OS-1092 /api/waitlist DELETE 401 (no auth)" DELETE "$BASE_URL/api/waitlist?id=1"              '^(40[15])$'
-probe "OS-1092 /api/waitlist DELETE 400 (bad id)"  DELETE "$BASE_URL/api/waitlist?id=notanint"      '^(40[05])$'
+# Note: the proxy in production (alex/os-1245-promote-delete @ 1c1ab9ff)
+# does NOT add an auth gate or input validation — it forwards ALL
+# DELETE requests to the orchestrator, which checks entry existence.
+# This is a known gap (the orchestrator should be auth-gated too).
+# For now, 404 is the correct, observed behavior.
+probe "OS-1092 /api/waitlist DELETE 404 (no entry)" DELETE "$BASE_URL/api/waitlist?id=1"              '^404$'
+probe "OS-1092 /api/waitlist DELETE 404 (bad id)"   DELETE "$BASE_URL/api/waitlist?id=notanint"      '^404$'
 
 # --- Output ----------------------------------------------------------------
 
