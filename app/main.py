@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from app.database import engine
 from app.models import Base
 from app.redis_client import close_redis
-from app.routers import health, onboard, os_config, tududi, briefing
+from app.routers import health, onboard, os_config, pnl, tududi, briefing
 
 
 @asynccontextmanager
@@ -24,3 +24,4 @@ app.include_router(onboard.router)
 app.include_router(os_config.router)
 app.include_router(tududi.router)
 app.include_router(briefing.router)
+app.include_router(pnl.router)

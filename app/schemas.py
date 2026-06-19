@@ -84,3 +84,35 @@ class SyncResponse(BaseModel):
 class BriefingResponse(BaseModel):
     user_id: uuid.UUID
     briefing: str
+
+
+# --- P&L ---
+
+class DailyPnL(BaseModel):
+    date: str
+    broker: str
+    pnl: float
+    nav: float
+    return_pct: float
+
+
+class BrokerSummary(BaseModel):
+    broker_key: str
+    broker_name: str
+    account_type: str
+    starting_balance: float
+    current_nav: float
+    total_pnl: float
+    total_return_pct: float
+    trading_days: int
+
+
+class PnLResponse(BaseModel):
+    total_pnl: float
+    daily_breakdown: list[DailyPnL]
+    per_broker: dict[str, BrokerSummary]
+    win_rate: float
+    total_trading_days: int
+    days_requested: int
+    start_date: str | None = None
+    end_date: str | None = None
