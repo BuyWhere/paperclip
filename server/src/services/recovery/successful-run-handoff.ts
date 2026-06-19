@@ -377,6 +377,9 @@ export function decideSuccessfulRunHandoff(input: {
   if (agent.status === "paused" || agent.status === "terminated" || agent.status === "pending_approval") {
     return { kind: "skip", reason: `agent status ${agent.status} is not invokable` };
   }
+  if (input.hasActiveRoutineContinuation) {
+    return { kind: "skip", reason: "active routine continuation owns the next action" };
+  }
   if (!isProductiveSuccessfulRun(input)) {
     return { kind: "skip", reason: "successful run did not produce handoff-relevant progress" };
   }
@@ -388,9 +391,6 @@ export function decideSuccessfulRunHandoff(input: {
   if (input.hasExplicitBlockerPath) return { kind: "skip", reason: "explicit blocker path owns the next action" };
   if (input.hasOpenRecoveryIssue) return { kind: "skip", reason: "open recovery issue owns the ambiguity" };
   if (input.hasPauseHold) return { kind: "skip", reason: "issue is under an active pause hold" };
-  if (input.hasActiveRoutineContinuation) {
-    return { kind: "skip", reason: "active routine continuation owns the next action" };
-  }
   if (input.budgetBlocked) return { kind: "skip", reason: "budget hard stop blocks corrective wake" };
   if (input.idempotentWakeExists) {
     return { kind: "skip", reason: "corrective handoff wake already exists for this source run" };

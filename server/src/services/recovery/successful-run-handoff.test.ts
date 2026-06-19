@@ -142,7 +142,7 @@ describe("successful run handoff decision", () => {
       livenessState: null,
     })).toEqual({
       kind: "skip",
-      reason: "successful run did not produce handoff-relevant progress",
+      reason: "active routine continuation owns the next action",
     });
     expect(decide({
       hasActiveRoutineContinuation: true,
