@@ -310,6 +310,17 @@ probe "OS-1117 /telegram/webhook GET non-200"   GET  "$ORCH_BASE_URL/telegram/we
 probe "OS-1117 /telegram/webhook POST 401"      POST "$ORCH_BASE_URL/telegram/webhook"             '^401$' '{}'
 fi
 
+# OS-1256: i18n locale redirects. /en and /zh must 307 → / (bare root),
+# and /register must 307 → /signup. A regression here (307 with no
+# Location header, per OS-1253 / OS-1364) silently breaks all en/zh
+# traffic and the /register landing page. The header_probe asserts the
+# actual Location value, not just the status code — without this the
+# 307+__next_error__ regression (T-18d through T-19d, recurred twice)
+# would pass a status-only check.
+header_probe "OS-1256 /en Location header is /"     GET "$BASE_URL/en"        Location '^/$'
+header_probe "OS-1256 /zh Location header is /"     GET "$BASE_URL/zh"        Location '^/$'
+header_probe "OS-1256 /register Location header is /signup" GET "$BASE_URL/register" Location '^/signup$'
+
 # OS-1092: web-dashboard DELETE /api/waitlist proxy. Two assertions:
 #  1) Unauthenticated DELETE -> 401 (proves the admin-auth gate is wired
 #     and the route is registered, not a generic 404). Also accepts 405
