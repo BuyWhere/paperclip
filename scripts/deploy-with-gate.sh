@@ -16,6 +16,8 @@
 #
 # Flow:
 #   1. Sanity checks (vercel CLI, env vars, working dir).
+#   1.5. Route-presence check: assert OS-1239 DELETE handler is present
+#        in src/app/api/waitlist/route.ts (OS-1463).
 #   2. `vercel deploy --yes` (NO --prod) → captures the candidate URL.
 #   3. Wait for the candidate to be reachable (poll /api/health, max 90s).
 #   4. Run smoke-probe-8os.sh --base-url $CANDIDATE_URL --skip-orchestrator
@@ -112,6 +114,22 @@ banner() { printf '\n=== %s ===\n' "$*"; }
 # --- step 1: pre-deploy checklist -----------------------------------------
 
 banner "Step 1/5: pre-deploy checklist"
+# --- step 1.5: route-presence check (OS-1239 / OS-1463) ---
+banner "Step 1.5/5: route-presence check — OS-1239 DELETE branch"
+ROUTE_FILE="src/app/api/waitlist/route.ts"
+if [[ ! -f "$ROUTE_FILE" ]]; then
+  echo "FATAL: $ROUTE_FILE does not exist in this working tree" >&2
+  echo "       (OS-1239 DELETE branch has regressed — file missing)" >&2
+  exit 1
+fi
+if ! grep -q 'export async function DELETE' "$ROUTE_FILE"; then
+  echo "FATAL: DELETE handler missing from $ROUTE_FILE" >&2
+  echo "DEPLOY GATE: OS-1239 DELETE branch missing from src/app/api/waitlist/route.ts" >&2
+  echo "             (OS-1463 — pre-deploy gate prevented a regression promotion)" >&2
+  exit 1
+fi
+echo "→ OS-1239 DELETE handler confirmed in $ROUTE_FILE"
+
 pwd
 vercel project ls --token "$TOKEN" 2>&1 | head -10 || true
 if [[ "$PROJECT_ID" == "prj_ra28Zh8IoehysZsknj1j7DKbqbBw" ]]; then
@@ -134,7 +152,7 @@ fi
 
 # --- step 2: deploy to preview -------------------------------------------
 
-banner "Step 2/5: vercel deploy --yes (no --prod)"
+banner "Step 2/6: vercel deploy --yes (no --prod)"
 echo "→ deploying to project $PROJECT_ID (alias will be assigned after gate passes)"
 DEPLOY_LOG=/tmp/deploy-gate-deploy.log
 if ! vercel deploy --yes --token "$TOKEN" --project "$PROJECT_ID" >"$DEPLOY_LOG" 2>&1; then
@@ -181,7 +199,7 @@ health_curl=(curl -s -m 5 -o /dev/null -w "%{http_code}"
              -H "x-vercel-protection-bypass: $VERCEL_PROTECTION_BYPASS"
              "$CANDIDATE_URL/api/health")
 
-banner "Step 3/5: wait for candidate $CANDIDATE_URL to be reachable (max ${HEALTH_TIMEOUT}s)"
+banner "Step 3/6: wait for candidate $CANDIDATE_URL to be reachable (max ${HEALTH_TIMEOUT}s)"
 elapsed=0
 ready=0
 while (( elapsed < HEALTH_TIMEOUT )); do
@@ -204,7 +222,7 @@ echo "→ candidate is up (200 on /api/health after ${elapsed}s)"
 
 # --- step 4: smoke probe against the candidate ---------------------------
 
-banner "Step 4/5: smoke probe against $CANDIDATE_URL"
+banner "Step 4/6: smoke probe against $CANDIDATE_URL"
 PROBE_JSON=/tmp/deploy-gate-probe.json
 set +e
 # Pass the Vercel automation-bypass secret to the smoke probe so the
@@ -229,7 +247,7 @@ fi
 
 # --- step 5: promote (or dry-run) -----------------------------------------
 
-banner "Step 5/5: promote candidate to $ALIAS"
+banner "Step 5/6: promote candidate to $ALIAS"
 if (( DRY_RUN == 1 )); then
   echo "DRY-RUN: would run: vercel alias $CANDIDATE_URL $ALIAS --token \$TOKEN --project $PROJECT_ID"
   echo "→ candidate URL: $CANDIDATE_URL"
