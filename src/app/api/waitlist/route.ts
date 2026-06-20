@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// OS-1394: force dynamic rendering — the initial deploy had no GET handler and
+// Vercel edge cached a 404. This export must come before any other module-level
+// statements to be recognized as a Next.js config export.
+export const dynamic = 'force-dynamic';
+
 // OS-1173: prefer the public api.8os.ai hostname (reachable from Vercel)
 // over the ORCHESTRATOR_URL env var, which is set to the unreachable
 // http://orchestrator.railway.internal:8000 in production. The env var
