@@ -221,6 +221,11 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// OS-1394: force dynamic rendering — prev deployment had no GET handler and
+// Vercel edge cached a 404. Next.js static optimization can also serve cached
+// HTML for GET routes. This export ensures the route always runs server-side.
+export const dynamic = 'force-dynamic';
+
 // OS-1394: add public GET /api/waitlist/stats handler so the front-end
 // (Mira's routine and any other caller) can fetch waitlist stats without
 // requiring ADMIN_SECRET auth. The response is public — count + source
@@ -235,7 +240,7 @@ export async function GET(_request: NextRequest) {
     if (!r.ok) {
       return NextResponse.json(
         { error: 'Failed to fetch waitlist stats' },
-        { status: 502 }
+        { status: 502, headers: { 'Cache-Control': 'no-store, no-cache' } }
       );
     }
     const data = await r.json() as { count: number; entries?: unknown[] };
@@ -254,7 +259,7 @@ export async function GET(_request: NextRequest) {
     console.error('Waitlist stats proxy error:', err);
     return NextResponse.json(
       { error: 'Upstream waitlist service unavailable' },
-      { status: 502 }
+      { status: 502, headers: { 'Cache-Control': 'no-store, no-cache' } }
     );
   }
 }
