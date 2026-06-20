@@ -327,6 +327,11 @@ WAIT_BODY="{\"email\":\"test-alex-1180-smoke-$(date +%s)@paperclip.example\",\"s
 probe     "OS-1173 /api/waitlist POST 200"       POST "$BASE_URL/api/waitlist"                    '^200$' "$WAIT_BODY" "" "waitlist"
 body_probe "OS-1173 /api/waitlist body success:true" POST "$BASE_URL/api/waitlist" '"success":true' "$WAIT_BODY" "" "waitlist"
 
+# OS-1394: Vercel GET /api/waitlist/stats proxy (nested route). Proves the
+# route handler is executing (not returning 404 from Next.js not-found).
+probe     "OS-1394 /api/waitlist/stats GET 200"      GET  "$BASE_URL/api/waitlist/stats"                     '^200$'
+body_probe "OS-1394 /api/waitlist/stats body count"     GET  "$BASE_URL/api/waitlist/stats"                     '"count":' ""
+
 # Orchestrator-direct probes (api.8os.ai). These hit a separate service
 # from the web-dashboard candidate URL, so they only make sense against
 # production. The pre-deploy gate passes --skip-orchestrator because the
