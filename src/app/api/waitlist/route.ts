@@ -241,8 +241,15 @@ export async function GET(_request: NextRequest) {
     const data = await r.json() as { count: number; entries?: unknown[] };
     // OS-1394: strip entries from public response — only expose count.
     // Full entries array requires ADMIN_SECRET auth and should not leak
-    // to unauthenticated callers.
-    return NextResponse.json({ count: data.count }, { status: 200 });
+    // to unauthenticated callers. Explicit Cache-Control prevents Vercel
+    // edge caching a stale 404 from the pre-GET-handler deploy.
+    return NextResponse.json(
+      { count: data.count },
+      {
+        status: 200,
+        headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate' },
+      }
+    );
   } catch (err) {
     console.error('Waitlist stats proxy error:', err);
     return NextResponse.json(
