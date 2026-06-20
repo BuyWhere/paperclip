@@ -1,4 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "rewrites": [
+    {
+      "source": "/(telegram/webhook|auth/apple/callback|auth/apple/exchange|auth/register|auth/verify|admin/waitlist/resync|me|referral/code|referral/record|referral/validate|v1/archetype|v1/archetype/:archetype_id|waitlist/entry/:entry_id|waitlist/join|waitlist/send-early-access|waitlist/stats|health)",
+      "destination": "https://orchestrator-production-1643.up.railway.app/:1"
+    }
+  ]
 }
