@@ -234,26 +234,22 @@ export async function GET(_request: NextRequest) {
     if (!r.ok) {
       return NextResponse.json(
         { error: 'Failed to fetch waitlist stats' },
-        { status: 502, headers: { 'Cache-Control': 'no-store, no-cache' } }
+        { status: 502 }
       );
     }
     const data = await r.json() as { count: number; entries?: unknown[] };
     // OS-1394: strip entries from public response — only expose count.
     // Full entries array requires ADMIN_SECRET auth and should not leak
-    // to unauthenticated callers. Explicit Cache-Control prevents Vercel
-    // edge caching a stale 404 from the pre-GET-handler deploy.
+    // to unauthenticated callers.
     return NextResponse.json(
-      { count: data.count },
-      {
-        status: 200,
-        headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate' },
-      }
+      { count: data.count, _route: 'GET /api/waitlist/stats' },
+      { status: 200 }
     );
   } catch (err) {
     console.error('Waitlist stats proxy error:', err);
     return NextResponse.json(
       { error: 'Upstream waitlist service unavailable' },
-      { status: 502, headers: { 'Cache-Control': 'no-store, no-cache' } }
+      { status: 502 }
     );
   }
 }
