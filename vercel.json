@@ -3,8 +3,72 @@
   "framework": "nextjs",
   "rewrites": [
     {
-      "source": "/(telegram/webhook|auth/apple/callback|auth/apple/exchange|auth/register|auth/verify|admin/waitlist/resync|me|referral/code|referral/record|referral/validate|v1/archetype|v1/archetype/:archetype_id|waitlist/entry/:entry_id|waitlist/join|waitlist/send-early-access|waitlist/stats|health)",
-      "destination": "https://orchestrator-production-1643.up.railway.app/:1"
+      "source": "/telegram/webhook",
+      "destination": "https://orchestrator-production-1643.up.railway.app/telegram/webhook"
+    },
+    {
+      "source": "/auth/apple/callback",
+      "destination": "https://orchestrator-production-1643.up.railway.app/auth/apple/callback"
+    },
+    {
+      "source": "/auth/apple/exchange",
+      "destination": "https://orchestrator-production-1643.up.railway.app/auth/apple/exchange"
+    },
+    {
+      "source": "/auth/register",
+      "destination": "https://orchestrator-production-1643.up.railway.app/auth/register"
+    },
+    {
+      "source": "/auth/verify",
+      "destination": "https://orchestrator-production-1643.up.railway.app/auth/verify"
+    },
+    {
+      "source": "/admin/waitlist/resync",
+      "destination": "https://orchestrator-production-1643.up.railway.app/admin/waitlist/resync"
+    },
+    {
+      "source": "/me",
+      "destination": "https://orchestrator-production-1643.up.railway.app/me"
+    },
+    {
+      "source": "/referral/code",
+      "destination": "https://orchestrator-production-1643.up.railway.app/referral/code"
+    },
+    {
+      "source": "/referral/record",
+      "destination": "https://orchestrator-production-1643.up.railway.app/referral/record"
+    },
+    {
+      "source": "/referral/validate",
+      "destination": "https://orchestrator-production-1643.up.railway.app/referral/validate"
+    },
+    {
+      "source": "/v1/archetype",
+      "destination": "https://orchestrator-production-1643.up.railway.app/v1/archetype"
+    },
+    {
+      "source": "/v1/archetype/:archetype_id",
+      "destination": "https://orchestrator-production-1643.up.railway.app/v1/archetype/:archetype_id"
+    },
+    {
+      "source": "/waitlist/entry/:entry_id",
+      "destination": "https://orchestrator-production-1643.up.railway.app/waitlist/entry/:entry_id"
+    },
+    {
+      "source": "/waitlist/join",
+      "destination": "https://orchestrator-production-1643.up.railway.app/waitlist/join"
+    },
+    {
+      "source": "/waitlist/send-early-access",
+      "destination": "https://orchestrator-production-1643.up.railway.app/waitlist/send-early-access"
+    },
+    {
+      "source": "/waitlist/stats",
+      "destination": "https://orchestrator-production-1643.up.railway.app/waitlist/stats"
+    },
+    {
+      "source": "/health",
+      "destination": "https://orchestrator-production-1643.up.railway.app/health"
     }
   ]
 }
