@@ -226,11 +226,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// OS-1394: force dynamic rendering — prev deployment had no GET handler and
-// Vercel edge cached a 404. Next.js static optimization can also serve cached
-// HTML for GET routes. This export ensures the route always runs server-side.
-export const dynamic = 'force-dynamic';
-
 // OS-1394: add public GET /api/waitlist/stats handler so the front-end
 // (Mira's routine and any other caller) can fetch waitlist stats without
 // requiring ADMIN_SECRET auth. The response is public — count + source
