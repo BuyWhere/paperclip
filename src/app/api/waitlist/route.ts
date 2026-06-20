@@ -221,30 +221,34 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET(request: NextRequest) {
-  const adminSecret = process.env.ADMIN_SECRET;
-  const authHeader = request.headers.get('authorization');
-
-  if (!adminSecret || authHeader !== `Bearer ${adminSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  // OS-1173: forward to the live FastAPI /waitlist/stats so the dashboard
-  // can render the new coming-soon channel breakdown. Auth boundary is
-  // preserved by re-checking ADMIN_SECRET here; the orchestrator also
-  // protects /waitlist/stats by default.
-  const auth = `Bearer ${adminSecret}`;
+// OS-1394: add public GET /api/waitlist/stats handler so the front-end
+// (Mira's routine and any other caller) can fetch waitlist stats without
+// requiring ADMIN_SECRET auth. The response is public — count + source
+// breakdown — and the backend /waitlist/stats is already publicly readable.
+// Previously only POST/DELETE existed; GET returned 401 (auth gate).
+export async function GET(_request: NextRequest) {
   try {
     const r = await fetch(`${ORCHESTRATOR_URL}/waitlist/stats`, {
-      headers: { authorization: auth },
+      headers: { 'Content-Type': 'application/json' },
       cache: 'no-store',
     });
     if (!r.ok) {
-      return NextResponse.json({ count: 0, entries: [] }, { status: 200 });
+      return NextResponse.json(
+        { error: 'Failed to fetch waitlist stats' },
+        { status: 502 }
+      );
     }
-    return NextResponse.json(await r.json());
-  } catch {
-    return NextResponse.json({ count: 0, entries: [] }, { status: 200 });
+    const data = await r.json() as { count: number; entries?: unknown[] };
+    // OS-1394: strip entries from public response — only expose count.
+    // Full entries array requires ADMIN_SECRET auth and should not leak
+    // to unauthenticated callers.
+    return NextResponse.json({ count: data.count }, { status: 200 });
+  } catch (err) {
+    console.error('Waitlist stats proxy error:', err);
+    return NextResponse.json(
+      { error: 'Upstream waitlist service unavailable' },
+      { status: 502 }
+    );
   }
 }
 

@@ -343,6 +343,12 @@ body_probe "OS-1117 /api/health body redis:ok"     GET  "$ORCH_BASE_URL/health" 
 # the route is actually wired and rejecting, NOT a default 200.
 probe "OS-1117 /telegram/webhook GET non-200"   GET  "$ORCH_BASE_URL/telegram/webhook"             '^(40[145]|404)$'
 probe "OS-1117 /telegram/webhook POST 401"      POST "$ORCH_BASE_URL/telegram/webhook"             '^401$' '{}'
+
+# OS-1394: direct Railway waitlist probe. Previously blind — smoke probe
+# had no coverage of /waitlist/stats on api.8os.ai (only health/telegram).
+# FastAPI uses /waitlist/* (no /api prefix); /api/waitlist/* always 404.
+probe "OS-1394 /waitlist/stats 200 (orch)"      GET  "$ORCH_BASE_URL/waitlist/stats"                '^200$'
+body_probe "OS-1394 /waitlist/stats body count"  GET  "$ORCH_BASE_URL/waitlist/stats"                '"count":' ""
 fi
 
 # OS-1092: web-dashboard DELETE /api/waitlist proxy. Two assertions:
