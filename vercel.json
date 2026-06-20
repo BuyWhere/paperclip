@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "rewrites": [
+    {
+      "source": "/api/waitlist/(.*)",
+      "destination": "https://orchestrator-production-1643.up.railway.app/waitlist/$1"
+    }
+  ]
+}
