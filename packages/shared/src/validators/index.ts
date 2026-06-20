@@ -474,3 +474,12 @@ export {
   type SetPluginState,
   type ListPluginState,
 } from "./plugin.js";
+
+export {
+  healthPoolSchema,
+  healthDbSchema,
+  healthResponseSchema,
+  type HealthPool,
+  type HealthDb,
+  type HealthResponse,
+} from "./health.js";

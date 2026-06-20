@@ -54,9 +54,10 @@ const allModeName = "all";
 const generalServerGroupName = "general-server";
 const generalWorkspacesAGroupName = "general-workspaces-a";
 const generalWorkspacesBGroupName = "general-workspaces-b";
+const apiContractsGroupName = "api-contracts";
 const generalWorkspacesAProjects = ["@paperclipai/ui", "paperclipai"];
 const generalWorkspacesBProjects = nonServerProjects.filter((project) => !generalWorkspacesAProjects.includes(project));
-const generalGroupNames = [generalServerGroupName, generalWorkspacesAGroupName, generalWorkspacesBGroupName];
+const generalGroupNames = [generalServerGroupName, generalWorkspacesAGroupName, generalWorkspacesBGroupName, apiContractsGroupName];
 const serializedServerVitestArgs = [
   "--no-file-parallelism",
   "--maxWorkers=1",
@@ -303,6 +304,18 @@ function runGeneralGroup(routeTests, groupName) {
 
   if (groupName === generalWorkspacesBGroupName) {
     runProjectGroup(generalWorkspacesBProjects, groupName);
+    return;
+  }
+
+  if (groupName === apiContractsGroupName) {
+    runVitest(
+      [
+        "--project",
+        "@paperclipai/server",
+        path.join(serverRoot, "src", "__tests__", "api-health-contract.test.ts"),
+      ],
+      `api-contracts: ${apiContractsGroupName}`,
+    );
     return;
   }
 
