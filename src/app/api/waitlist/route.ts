@@ -235,7 +235,6 @@ export async function GET(_request: NextRequest) {
   try {
     const r = await fetch(`${ORCHESTRATOR_URL}/waitlist/stats`, {
       headers: { 'Content-Type': 'application/json' },
-      cache: 'no-store',
     });
     if (!r.ok) {
       return NextResponse.json(
