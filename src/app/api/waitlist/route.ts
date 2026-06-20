@@ -221,38 +221,8 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// OS-1394: add public GET /api/waitlist/stats handler so the front-end
-// (Mira's routine and any other caller) can fetch waitlist stats without
-// requiring ADMIN_SECRET auth. The response is public — count + source
-// breakdown — and the backend /waitlist/stats is already publicly readable.
-// Previously only POST/DELETE existed; GET returned 401 (auth gate).
-export async function GET(_request: NextRequest) {
-  try {
-    const r = await fetch(`${ORCHESTRATOR_URL}/waitlist/stats`, {
-      headers: { 'Content-Type': 'application/json' },
-    });
-    if (!r.ok) {
-      return NextResponse.json(
-        { error: 'Failed to fetch waitlist stats' },
-        { status: 502 }
-      );
-    }
-    const data = await r.json() as { count: number; entries?: unknown[] };
-    // OS-1394: strip entries from public response — only expose count.
-    // Full entries array requires ADMIN_SECRET auth and should not leak
-    // to unauthenticated callers.
-    return NextResponse.json(
-      { count: data.count, _route: 'GET /api/waitlist/stats' },
-      { status: 200 }
-    );
-  } catch (err) {
-    console.error('Waitlist stats proxy error:', err);
-    return NextResponse.json(
-      { error: 'Upstream waitlist service unavailable' },
-      { status: 502 }
-    );
-  }
-}
+// OS-1394: GET /api/waitlist/stats is now served by the dedicated
+// /api/waitlist/stats/route.ts nested route handler.
 
 // OS-1239: add DELETE branch so the Vercel proxy forwards row-deletion
 // requests to the orchestrator's /waitlist/entry/{entry_id} endpoint
