@@ -67,6 +67,22 @@
       "destination": "https://orchestrator-production-1643.up.railway.app/waitlist/stats"
     },
     {
+      "source": "/api/waitlist",
+      "destination": "https://orchestrator-production-1643.up.railway.app/waitlist/join"
+    },
+    {
+      "source": "/api/waitlist/(.*)",
+      "destination": "https://orchestrator-production-1643.up.railway.app/waitlist/$1"
+    },
+    {
+      "source": "/api/waitlist/stats",
+      "destination": "https://orchestrator-production-1643.up.railway.app/waitlist/stats"
+    },
+    {
+      "source": "/api/health",
+      "destination": "https://orchestrator-production-1643.up.railway.app/health"
+    },
+    {
       "source": "/health",
       "destination": "https://orchestrator-production-1643.up.railway.app/health"
     }
