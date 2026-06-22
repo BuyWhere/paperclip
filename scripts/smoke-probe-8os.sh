@@ -292,6 +292,18 @@ WAIT_BODY="{\"email\":\"test-alex-1180-smoke-$(date +%s)@paperclip.example\",\"s
 probe     "OS-1173 /api/waitlist POST 200"       POST "$BASE_URL/api/waitlist"                    '^200$' "$WAIT_BODY" "" "waitlist"
 body_probe "OS-1173 /api/waitlist body success:true" POST "$BASE_URL/api/waitlist" '"success":true' "$WAIT_BODY" "" "waitlist"
 
+# OS-1503: /api/waitlist/stats must 200 against the Vercel proxy. The
+# bare /waitlist/stats has been working since OS-1430 (Vercel rewrite
+# routes that path to Railway), but /api/waitlist/stats was missing
+# the matching rewrite in the BuyWhere/paperclip vercel.json — the
+# Next.js catch-all 404'd the request. Three recurrences (OS-1430,
+# OS-1469, OS-1503) before the rewrite was added; this probe closes
+# the loop. Asserts status 200 (not 404) and a JSON body with a
+# "count" key (proves the body is a waitlist payload, not a Next.js
+# HTML 404 page).
+probe     "OS-1503 /api/waitlist/stats 200"     GET  "$BASE_URL/api/waitlist/stats"              '^200$' "" "" "waitlist-stats"
+body_probe "OS-1503 /api/waitlist/stats body has count"  GET "$BASE_URL/api/waitlist/stats" '"count":' "" "" "waitlist-stats"
+
 # Orchestrator-direct probes (api.8os.ai). These hit a separate service
 # from the web-dashboard candidate URL, so they only make sense against
 # production. The pre-deploy gate passes --skip-orchestrator because the
