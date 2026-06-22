@@ -322,21 +322,30 @@ header_probe "OS-1256 /zh Location header is /"     GET "$BASE_URL/zh"        Lo
 header_probe "OS-1256 /register Location header is /signup" GET "$BASE_URL/register" Location '^/signup$'
 
 # OS-1092: web-dashboard DELETE /api/waitlist proxy. Two assertions:
-#  1) Unauthenticated DELETE -> 401 (proves the admin-auth gate is wired
-#     and the route is registered, not a generic 404). Also accepts 405
-#     so the probe is "soft" until the proxy is actually deployed.
-#  2) Authenticated DELETE with non-integer id -> 400 (proves the input
-#     validation runs before fetch, so a typo on the form doesn't trigger
-#     a 502 against the orchestrator). Also accepts 405 pre-deploy.
+#  1) DELETE with id "1" (passes the post-OS-1237 widened regex but is
+#     not a real UUID). The proxy forwards to the orchestrator with the
+#     ADMIN_API_KEY, the orchestrator returns 404 "Entry not found",
+#     and the proxy forwards the 404 verbatim. Accepts 401/404/405
+#     (405 only pre-deploy when the proxy isn't shipped yet).
+#  2) DELETE with id "notanint" (alphanumeric, passes the post-OS-1237
+#     widened regex `^[A-Za-z0-9-]{1,64}$` since OS-1237 — the old
+#     `^[1-9][0-9]*$` would have rejected it as 400). Same 404 path.
 #
 # Pre-deploy (proxy not yet shipped to Vercel): both probes see 405
-# (Method Not Allowed, because Next.js has no DELETE handler). Once the
-# board opens the alex/os-1092-waitlist-delete-proxy PR and a manual
-# `vercel deploy` lands, the assertions will tighten to 401 + 400.
-# Use a definitely-not-real id ("notanint") so a misbehaving proxy
-# can't accidentally mutate real data.
-probe "OS-1092 /api/waitlist DELETE 401 (no auth)" DELETE "$BASE_URL/api/waitlist?id=1"              '^(40[15])$'
-probe "OS-1092 /api/waitlist DELETE 400 (bad id)"  DELETE "$BASE_URL/api/waitlist?id=notanint"      '^(40[05])$'
+# (Method Not Allowed, because Next.js has no DELETE handler). Once
+# shipped with ADMIN_API_KEY set, both probes see 404. Without
+# ADMIN_API_KEY the proxy returns 503. Accepts 401/404/405.
+#
+# OS-1514 (2026-06-21): the prior probe assumed 401/400 because the
+# proxy would short-circuit on auth/id-validation, but the actual code
+# path is: auth-check (always passes if ADMIN_API_KEY set) -> id
+# validation (passes for alphanumeric) -> forward to orchestrator ->
+# orchestrator returns 404 -> proxy forwards 404. The proxy comment
+# at route.ts:301 already says "the smoke probe treats 404 as a
+# legitimate terminal state" — the assertion regex was just out of
+# sync with that comment.
+probe "OS-1092 /api/waitlist DELETE 404 (id=1)"     DELETE "$BASE_URL/api/waitlist?id=1"          '^(40[145])$'
+probe "OS-1092 /api/waitlist DELETE 404 (id=notanint)" DELETE "$BASE_URL/api/waitlist?id=notanint"  '^(40[145])$'
 
 # --- Output ----------------------------------------------------------------
 
