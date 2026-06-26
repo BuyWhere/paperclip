@@ -4931,7 +4931,7 @@ export function issueService(db: Db) {
         .set(
           preserveAssignee
             ? lockFields
-            : { ...lockFields, assigneeAgentId: null },
+            : { ...lockFields, status: "todo", assigneeAgentId: null },
         )
         .where(eq(issues.id, id))
         .returning()
