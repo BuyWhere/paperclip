@@ -235,7 +235,7 @@ async function repairManagedInstructionPathWritable(targetPath: string): Promise
     if (!stat) continue;
     if (stat.isSymbolicLink()) continue;
 
-    const desiredMode = stat.isDirectory() ? (stat.mode | 0o700) & 0o777 : (stat.mode | 0o600) & 0o777;
+    const desiredMode = stat.isDirectory() ? 0o700 : 0o600;
     if ((stat.mode & 0o777) !== desiredMode) {
       await fs.chmod(currentPath, desiredMode).catch(() => undefined);
     }
