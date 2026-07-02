@@ -6,7 +6,8 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { jwtVerify, importSPKI } from 'jose'
 import { prisma } from '@/lib/db/prisma'
-import { orderTasksByEnergyHours } from '@/lib/scheduling/engine'
+import { orderTasksByWorkPrefs } from '@/lib/scheduling/engine'
+import { getWorkPreferences } from '@/lib/work-preferences'
 import { Sidebar } from '@/components/dashboard/Sidebar'
 import { ProgressRing } from '@/components/dashboard/ProgressRing'
 import { CalendarMini } from '@/components/dashboard/CalendarMini'
@@ -31,14 +32,7 @@ const ARCHETYPE_DENSITY: Record<string, { cols: number; gapPx: number }> = {
   spacious: { cols: 1, gapPx: 32 },
 }
 
-const DEFAULT_ENERGY: Record<number, 'green' | 'yellow' | 'red'> = Object.fromEntries(
-  Array.from({ length: 24 }, (_, i) => {
-    if (i >= 9 && i <= 11) return [i, 'green' as const]
-    if (i >= 14 && i <= 16) return [i, 'green' as const]
-    if ((i >= 6 && i <= 8) || (i >= 13 && i <= 17)) return [i, 'yellow' as const]
-    return [i, 'red' as const]
-  })
-)
+// Energy-hours removed in OS-2114; tasks now ordered by WorkPreferences (working window + priority)
 
 type InsightPriority = 'high' | 'medium' | 'low'
 
@@ -67,13 +61,12 @@ export default async function DashboardPage() {
   const todayEnd = new Date(now); todayEnd.setHours(23, 59, 59, 999)
   const weekEnd = new Date(now); weekEnd.setDate(weekEnd.getDate() + 7)
 
-  const [user, archetype, goals, todayTasksRaw, energyProfileRaw, settings, upcomingEvents, completedThisWeek, streakDays, userProfile] =
+  const [user, archetype, goals, todayTasksRaw, settings, upcomingEvents, completedThisWeek, streakDays, userProfile] =
     await Promise.all([
       prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true } }),
       prisma.archetypeResult.findUnique({ where: { userId } }),
       prisma.goal.findMany({ where: { userId, status: 'active' }, orderBy: { createdAt: 'asc' } }),
       prisma.oSTask.findMany({ where: { userId, scheduledAt: { gte: todayStart, lte: todayEnd }, status: { not: 'cancelled' } }, orderBy: { scheduledAt: 'asc' } }),
-      prisma.energyProfile.findUnique({ where: { userId } }),
       prisma.userSettings.findUnique({ where: { userId } }),
       prisma.calendarEvent.findMany({ where: { userId, startAt: { gte: now, lte: weekEnd } }, orderBy: { startAt: 'asc' }, take: 20 }),
       prisma.activityLog.count({ where: { userId, action: 'task_completed', createdAt: { gte: new Date(now.getTime() - 7 * 86400000) } } }),
@@ -81,11 +74,11 @@ export default async function DashboardPage() {
       prisma.userProfile.findUnique({ where: { userId }, select: { birthTimezone: true } }),
     ])
 
-  const energyMap = (energyProfileRaw?.hourMap as Record<number, 'green' | 'yellow' | 'red'>) ?? DEFAULT_ENERGY
+  const workPreferences = await getWorkPreferences(userId)
 
-  const todayTasksOrdered = orderTasksByEnergyHours(
-    todayTasksRaw.map((t) => ({ id: t.id, scheduledAt: t.scheduledAt, energyRequired: t.energyRequired, priority: t.priority })),
-    energyMap
+  const todayTasksOrdered = orderTasksByWorkPrefs(
+    todayTasksRaw.map((t) => ({ id: t.id, scheduledAt: t.scheduledAt, priority: t.priority })),
+    workPreferences
   )
   const todayTaskMap = new Map(todayTasksRaw.map((t) => [t.id, t]))
   const todayTasks = todayTasksOrdered.map((t) => todayTaskMap.get(t.id)!)
@@ -96,11 +89,17 @@ export default async function DashboardPage() {
   const greeting = getGreeting()
   const userName = user?.email?.split('@')[0] ?? 'there'
   const archetypeName = archetype?.archetypeName ?? 'Explorer'
-  const insightResult = await getDailyInsight(userId, userProfile?.birthTimezone ?? 'UTC')
-  const insightFeedback = await prisma.dailyInsight.findUnique({
-    where: { userId_date: { userId, date: insightResult.date } },
-    include: { feedback: true },
-  })
+  let insightResult = null
+  let insightFeedback = null
+  try {
+    insightResult = await getDailyInsight(userId, userProfile?.birthTimezone ?? 'UTC')
+    insightFeedback = await prisma.dailyInsight.findUnique({
+      where: { userId_date: { userId, date: insightResult.date } },
+      include: { feedback: true },
+    })
+  } catch (e) {
+    console.warn('[dashboard] getDailyInsight failed, degrading gracefully:', e instanceof Error ? e.message : String(e))
+  }
   const insightPriority = deriveInsightPriority(todayTasks)
   const insightPriorityReason = getInsightPriorityReason(insightPriority, todayTasks.length, goals.length)
 
@@ -160,6 +159,7 @@ export default async function DashboardPage() {
 
         {/* Main Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: cols === 1 ? '1fr' : cols === 3 ? '1fr 1fr 1fr' : '2fr 1fr', gap: gapPx }}>
+          {insightResult ? (
           <InsightDisplayCard
             insight={insightResult.content}
             date={insightResult.date}
@@ -171,6 +171,11 @@ export default async function DashboardPage() {
             priority={insightPriority}
             priorityReason={insightPriorityReason}
           />
+          ) : (
+          <div style={{ background: '#111', border: '1px solid #1e1e1e', borderRadius: 14, padding: 20, color: '#444', fontSize: 13 }}>
+            Daily insight unavailable — check back soon.
+          </div>
+          )}
 
           {/* Goals Overview Panel */}
           <div style={{ background: '#111', border: '1px solid #1e1e1e', borderRadius: 14, padding: 20 }}>
@@ -214,15 +219,17 @@ export default async function DashboardPage() {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {todayTasks.slice(0, 6).map((t) => {
-                  const energy = t.scheduledAt ? (energyMap[t.scheduledAt.getHours()] ?? 'red') : 'red'
-                  const energyColor = energy === 'green' ? '#22c55e' : energy === 'yellow' ? '#f59e0b' : '#ef4444'
+                  const inWindow = t.scheduledAt != null
+                    && t.scheduledAt.getHours() >= workPreferences.workingWindowStart
+                    && t.scheduledAt.getHours() < workPreferences.workingWindowEnd
+                  const dotColor = inWindow ? '#22c55e' : '#555'
                   return (
                     <div key={t.id} style={{
                       display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px',
                       borderRadius: 8, background: '#0d0d0d', border: '1px solid #1a1a1a',
                       opacity: t.status === 'done' ? 0.5 : 1,
                     }}>
-                      <div style={{ width: 6, height: 6, borderRadius: '50%', background: energyColor, flexShrink: 0 }} />
+                      <div style={{ width: 6, height: 6, borderRadius: '50%', background: dotColor, flexShrink: 0 }} title={inWindow ? 'In working window' : 'Outside working window'} />
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 13, color: t.status === 'done' ? '#555' : '#ededed', textDecoration: t.status === 'done' ? 'line-through' : 'none' }}>
                           {t.name}

@@ -32,7 +32,9 @@ interface BriefingPayload {
   goals: Array<{
     id: string
     name: string
+    domainId: string
     progress: number
+    tagline: string | null
   }>
 }
 
@@ -335,6 +337,11 @@ export function BriefingContent() {
                 <div key={goal.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13, color: '#ccc', marginBottom: 4 }}>{goal.name}</div>
+                    {goal.tagline ? (
+                      <div style={{ fontSize: 11, color: '#6366f1', fontStyle: 'italic', marginBottom: 4, lineHeight: 1.4 }}>
+                        {goal.tagline}
+                      </div>
+                    ) : null}
                     <div style={{ height: 4, background: '#1a1a1a', borderRadius: 2, overflow: 'hidden' }}>
                       <div style={{ height: '100%', width: `${goal.progress * 100}%`, background: '#6366f1', borderRadius: 2 }} />
                     </div>

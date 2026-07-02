@@ -75,39 +75,40 @@ export function Header() {
         </nav>
 
         {/* CTA */}
-        <Link
-          href="/coming-soon"
-          onClick={() => posthog.capture('coming_soon_click', { source: 'header' })}
-          style={{
-            padding: '0.5rem 1.25rem',
-            background: 'rgba(118, 75, 162, 0.12)',
-            border: '1px solid rgba(118, 75, 162, 0.4)',
-            borderRadius: '8px',
-            color: '#c4b5fd',
-            textDecoration: 'none',
-            fontSize: '0.875rem',
-            fontWeight: 600,
-            whiteSpace: 'nowrap',
-          }}
-        >
-          Reserve — July 7
-        </Link>
-        <Link
-          href="/quiz"
-          onClick={() => posthog.capture('quiz_start', { source: 'landing' })}
-          style={{
-            padding: '0.5rem 1.25rem',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            borderRadius: '8px',
-            color: '#fff',
-            textDecoration: 'none',
-            fontSize: '0.875rem',
-            fontWeight: 600,
-            whiteSpace: 'nowrap',
-          }}
-        >
-          Take the Quiz
-        </Link>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <Link
+            href="/coming-soon"
+            onClick={() => posthog.capture('coming_soon_click', { source: 'header' })}
+            style={{
+              fontSize: '0.8125rem',
+              fontWeight: 500,
+              color: 'var(--color-text-muted)',
+              textDecoration: 'none',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            July 7?{' '}
+            <span style={{ color: '#c4b5fd', textDecoration: 'underline', textUnderlineOffset: '2px' }}>
+              Reserve
+            </span>
+          </Link>
+          <Link
+            href="/quiz"
+            onClick={() => posthog.capture('quiz_start', { source: 'header' })}
+            style={{
+              padding: '0.5rem 1.25rem',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              borderRadius: '8px',
+              color: '#fff',
+              textDecoration: 'none',
+              fontSize: '0.875rem',
+              fontWeight: 600,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Take the Quiz
+          </Link>
+        </div>
       </div>
     </header>
   );

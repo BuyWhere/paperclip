@@ -7,6 +7,7 @@ import { prisma } from '@/lib/db/prisma'
 import { Sidebar } from '@/components/dashboard/Sidebar'
 import { ProgressRing } from '@/components/dashboard/ProgressRing'
 import { QuickAdd } from '@/components/dashboard/QuickAdd'
+import { goalTaglineForDomain, type GoalDomain } from '@/lib/goal-taglines'
 import Link from 'next/link'
 
 async function getUserId(): Promise<string> {
@@ -37,13 +38,19 @@ const DOMAIN_ICONS: Record<string, string> = {
 export default async function GoalsPage() {
   const userId = await getUserId()
 
-  const goals = await prisma.goal.findMany({
-    where: { userId, status: { in: ['active', 'paused'] } },
-    include: {
-      projects: { select: { id: true, tasks: { where: { status: { not: 'cancelled' } }, select: { status: true } } } },
-    },
-    orderBy: { createdAt: 'asc' },
-  })
+  const [goals, profile] = await Promise.all([
+    prisma.goal.findMany({
+      where: { userId, status: { in: ['active', 'paused'] } },
+      include: {
+        projects: { select: { id: true, tasks: { where: { status: { not: 'cancelled' } }, select: { status: true } } } },
+      },
+      orderBy: { createdAt: 'asc' },
+    }),
+    prisma.userProfile.findUnique({
+      where: { userId },
+      select: { dayElement: true, dayPolarity: true, dominantElement: true },
+    }),
+  ])
 
   const sidebarGoals = goals.map((g) => ({ id: g.id, domainId: g.domainId, name: g.name, progress: g.progress }))
 
@@ -72,6 +79,7 @@ export default async function GoalsPage() {
               const doneTasks = allTasks.filter((t) => t.status === 'done').length
               const totalTasks = allTasks.length
               const domainColor = DOMAIN_COLORS[g.domainId] ?? '#6366f1'
+              const tagline = goalTaglineForDomain(profile, g.domainId as GoalDomain)
 
               return (
                 <Link key={g.id} href={`/goals/${g.id}`} style={{ textDecoration: 'none' }}>
@@ -91,6 +99,16 @@ export default async function GoalsPage() {
                         </div>
                         <div style={{ fontWeight: 600, fontSize: 14, color: '#ededed' }}>{g.name}</div>
                         <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>{g.definition.slice(0, 80)}{g.definition.length > 80 ? '…' : ''}</div>
+                        {tagline && (
+                          <div style={{
+                            marginTop: 8, fontSize: 11, fontStyle: 'italic', color: domainColor,
+                            opacity: 0.85, lineHeight: 1.4,
+                            borderLeft: `2px solid ${domainColor}55`,
+                            paddingLeft: 8,
+                          }}>
+                            {tagline}
+                          </div>
+                        )}
                       </div>
                     </div>
 

@@ -61,7 +61,7 @@ model User {
   goals             Goal[]
   projects          OSProject[]
   tasks             OSTask[]
-  energyProfile     EnergyProfile?
+  workPreferences   WorkPreferences?
   calendarEvents    CalendarEvent[]
   activityLogs      ActivityLog[]
   settings          UserSettings?
@@ -283,6 +283,9 @@ enum GoalStatus {
   paused
   completed
   archived
+  planned
+  cancelled
+  achieved
 }
 
 enum TaskStatus {
@@ -313,9 +316,9 @@ model Goal {
   name        String
   definition  String
   checkMethod String     // binary | numeric | time | streak | milestone
-  checkConfig Json       // { unit?, target?, milestones? }
+  checkConfig String     // JSON { unit?, target?, milestones? } — TEXT in prod
   status      GoalStatus @default(active)
-  progress    Float      @default(0) // 0.0 - 1.0
+  progress    String     @default("0") // TEXT in prod, stores numeric string 0.0 - 1.0
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
@@ -360,7 +363,6 @@ model OSTask {
   status           TaskStatus   @default(todo)
   scheduledAt      DateTime?    // null = unscheduled
   scheduledEnd     DateTime?    // derived from scheduledAt + duration
-  energyRequired   String       @default("green")  // green | yellow | red
   domainId         String?      // for NLP-created tasks
   recurrence       RecurrenceRule @default(none)
   recurrenceUntil  DateTime?
@@ -380,17 +382,21 @@ model OSTask {
   @@map("os_tasks")
 }
 
-model EnergyProfile {
-  id        String   @id @default(uuid())
-  userId    String   @unique
-  // JSON: Record<number, "green"|"yellow"|"red"> — 0-23 hour index
-  hourMap   Json
-  updatedAt DateTime @updatedAt
-  createdAt DateTime @default(now())
+// User-editable working preferences. Seeded from archetype; user can override any field.
+// Replaces the old "energy hours" / EnergyProfile concept (see OS-2114).
+model WorkPreferences {
+  userId             String   @id
+  workingWindowStart Int      // hour 0-23, e.g. 9
+  workingWindowEnd   Int      // hour 0-23, e.g. 17
+  blockLengthMin     Int      @default(50)  // default block length in minutes (25 / 50 / 90)
+  batching           String   @default("batch")  // 'batch' | 'spread'
+  planningCadence    String   @default("weekly")  // 'daily' | 'weekly' | 'biweekly'
+  updatedAt          DateTime @updatedAt
+  createdAt          DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@map("energy_profiles")
+  @@map("work_preferences")
 }
 
 model CalendarEvent {

@@ -67,7 +67,7 @@ export const DOMAIN_COLORS: Record<GoalDomain, string> = {
   Legacy: '#14b8a6',
 };
 
-export type EnergyAlignment = 'optimal' | 'okay' | 'off-peak';
+export type WindowFit = 'in_window' | 'near_window' | 'outside_window';
 
 export type FocusTaskStatus = 'todo' | 'in_progress' | 'done' | 'cancelled';
 
@@ -77,7 +77,7 @@ export interface FocusTask {
   goalId: string;
   goalName: string;
   goalDomain: GoalDomain;
-  energyAlignment: EnergyAlignment;
+  windowFit: WindowFit;
   scheduledTime: string;
   duration: number;
   completed: boolean;

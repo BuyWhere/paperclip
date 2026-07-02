@@ -63,7 +63,7 @@ Rules:
 - Tasks start with action verbs (Write, Schedule, Build, Research, Call, etc.)
 - Duration reflects realistic time investment
 - Priority: high = critical path, medium = important, low = nice to have
-- suggestedSchedule should match the user's archetype energy pattern
+- suggestedSchedule should fit the user's working window and block length preferences
 - Return 15-30 tasks total`
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {

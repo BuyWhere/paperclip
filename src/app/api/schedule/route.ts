@@ -1,11 +1,16 @@
 /**
  * POST /api/schedule
- * Auto-schedule a task: finds the best energy-hour slot and avoids conflicts.
+ * Auto-schedule a task: finds the best working-window slot, avoids conflicts.
+ *
+ * Replaces the legacy energy-hour slot finder (see OS-2114). Slot selection
+ * is now driven by the user's WorkPreferences (working window, block length)
+ * rather than a green/yellow/red energy map.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db/prisma'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { findBestSlot } from '@/lib/scheduling/engine'
+import { getWorkPreferences } from '@/lib/work-preferences'
 import { z } from 'zod'
 
 const Schema = z.object({
@@ -13,15 +18,6 @@ const Schema = z.object({
   searchFrom: z.string().datetime().optional(),
   searchDays: z.number().int().min(1).max(30).default(7),
 })
-
-const DEFAULT_ENERGY: Record<number, 'green' | 'yellow' | 'red'> = Object.fromEntries(
-  Array.from({ length: 24 }, (_, i) => {
-    if (i >= 9 && i <= 11) return [i, 'green' as const]
-    if (i >= 14 && i <= 16) return [i, 'green' as const]
-    if ((i >= 6 && i <= 8) || (i >= 13 && i <= 17)) return [i, 'yellow' as const]
-    return [i, 'red' as const]
-  })
-)
 
 export async function POST(req: NextRequest) {
   const auth = await requireAuth(req)
@@ -34,9 +30,8 @@ export async function POST(req: NextRequest) {
   const task = await prisma.oSTask.findFirst({ where: { id: parsed.data.taskId, userId: auth.userId } })
   if (!task) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
 
-  // Get user energy profile
-  const energyProfileRaw = await prisma.energyProfile.findUnique({ where: { userId: auth.userId } })
-  const energyMap = (energyProfileRaw?.hourMap as Record<number, 'green' | 'yellow' | 'red'>) ?? DEFAULT_ENERGY
+  // Get user work preferences (drives working window + block length)
+  const workPreferences = await getWorkPreferences(auth.userId)
 
   // Get existing calendar events as conflicts
   const searchFrom = parsed.data.searchFrom ? new Date(parsed.data.searchFrom) : new Date()
@@ -50,8 +45,7 @@ export async function POST(req: NextRequest) {
 
   const slot = findBestSlot({
     durationMinutes: task.duration,
-    energyRequired: task.energyRequired as 'green' | 'yellow' | 'red',
-    energyMap,
+    workPreferences,
     existingEvents,
     searchFrom,
     searchDays: parsed.data.searchDays,

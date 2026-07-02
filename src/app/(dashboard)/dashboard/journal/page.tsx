@@ -72,7 +72,7 @@ export default async function JournalPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28, textAlign: 'left' }}>
                 {[
                   'AI-summarised daily entries',
-                  'Mood and energy trend tracking',
+                  'Mood and focus trend tracking',
                   'Archetype-aware journaling prompts',
                   'Weekly reflection synthesis',
                 ].map((feature) => (

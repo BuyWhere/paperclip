@@ -100,37 +100,18 @@ export default function Home() {
             href="/coming-soon"
             aria-label="Reserve your spot for the July 7 launch"
             style={{
-              padding: '1rem 2rem',
-              fontSize: '1.125rem',
-              fontWeight: 600,
-              background: 'rgba(118, 75, 162, 0.12)',
-              border: '1px solid rgba(118, 75, 162, 0.5)',
-              borderRadius: '12px',
-              color: '#c4b5fd',
+              fontSize: '0.9375rem',
+              fontWeight: 500,
+              color: '#888',
               textDecoration: 'none',
-              transition: 'background 0.2s, border-color 0.2s',
+              padding: '1rem 0.5rem',
+              transition: 'color 0.2s',
             }}
           >
-            Reserve your spot — July 7
-          </Link>
-          <Link
-            href="#how-it-works"
-            aria-label="See How It Works"
-            style={{
-              padding: '1rem 2rem',
-              fontSize: '1.125rem',
-              fontWeight: 600,
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.15)',
-              borderRadius: '12px',
-              color: '#fff',
-              cursor: 'pointer',
-              transition: 'background 0.2s',
-              textDecoration: 'none',
-              display: 'inline-block',
-            }}
-          >
-            See How It Works
+            or{' '}
+            <span style={{ color: '#c4b5fd', textDecoration: 'underline', textUnderlineOffset: '3px' }}>
+              reserve your spot
+            </span>
           </Link>
         </nav>
 

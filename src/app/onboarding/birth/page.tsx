@@ -68,6 +68,7 @@ export default function BirthPage() {
   const [timeKnown, setTimeKnown] = useState(false)
   const [hour, setHour] = useState<number>(12)
   const [minute, setMinute] = useState<number>(0)
+  const [amPm, setAmPm] = useState<'AM' | 'PM'>('PM')
 
   // Timezone — auto-detect
   const [timezone, setTimezone] = useState<string>('')
@@ -164,7 +165,12 @@ export default function BirthPage() {
     setError('')
 
     const birthDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-    const birthTime = timeKnown ? `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}` : null
+    const birthTime = timeKnown ? (() => {
+      let h = hour
+      if (amPm === 'PM' && h !== 12) h += 12
+      if (amPm === 'AM' && h === 12) h = 0
+      return `${String(h).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+    })() : null
     const parsedLocation = location ?? (locationQuery ? parseLocationFromText(locationQuery) : null)
 
     try {
@@ -372,22 +378,46 @@ export default function BirthPage() {
           </div>
 
           {timeKnown ? (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-              <div>
-                <label style={{ ...labelStyle, marginBottom: '0.35rem' }}>Hour</label>
-                <select value={hour} onChange={e => setHour(Number(e.target.value))} style={selectStyle}>
-                  {Array.from({ length: 24 }, (_, i) => (
-                    <option key={i} value={i}>{String(i).padStart(2, '0')}:00</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label style={{ ...labelStyle, marginBottom: '0.35rem' }}>Minute</label>
-                <select value={minute} onChange={e => setMinute(Number(e.target.value))} style={selectStyle}>
-                  {[0, 15, 30, 45].map(m => (
-                    <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
-                  ))}
-                </select>
+            <div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ ...labelStyle, marginBottom: '0.35rem' }}>Hour</label>
+                  <select
+                    value={hour}
+                    onChange={e => setHour(Number(e.target.value))}
+                    style={selectStyle}
+                    aria-label="Hour"
+                  >
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
+                      <option key={h} value={h}>{h}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ ...labelStyle, marginBottom: '0.35rem' }}>AM / PM</label>
+                  <select
+                    value={amPm}
+                    onChange={e => setAmPm(e.target.value as 'AM' | 'PM')}
+                    style={selectStyle}
+                    aria-label="AM or PM"
+                  >
+                    <option value="AM">AM</option>
+                    <option value="PM">PM</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ ...labelStyle, marginBottom: '0.35rem' }}>Minute</label>
+                  <select
+                    value={minute}
+                    onChange={e => setMinute(Number(e.target.value))}
+                    style={selectStyle}
+                    aria-label="Minute"
+                  >
+                    {[0, 15, 30, 45].map(m => (
+                      <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
           ) : (

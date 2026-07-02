@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db/prisma'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getDailyInsight } from '@/lib/deepseek/insights'
+import { goalTaglineForDomain, type GoalDomain } from '@/lib/goal-taglines'
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuth(req)
@@ -31,8 +32,19 @@ export async function GET(req: NextRequest) {
         orderBy: { startAt: 'asc' },
         take: 10,
       }),
-      prisma.userProfile.findUnique({ where: { userId }, select: { birthTimezone: true } }),
+      prisma.userProfile.findUnique({
+        where: { userId },
+        select: { birthTimezone: true, dayElement: true, dayPolarity: true, dominantElement: true },
+      }),
     ])
+
+    const taglineInput = userProfile && userProfile.dayElement
+      ? {
+          dayElement: userProfile.dayElement,
+          dayPolarity: userProfile.dayPolarity,
+          dominantElement: userProfile.dominantElement,
+        }
+      : null
 
     const insight = await getDailyInsight(userId, userProfile?.birthTimezone ?? 'UTC')
     const todayDate = now.toLocaleDateString('en-US', {
@@ -68,7 +80,9 @@ export async function GET(req: NextRequest) {
       goals: goals.map((goal) => ({
         id: goal.id,
         name: goal.name,
+        domainId: goal.domainId,
         progress: goal.progress,
+        tagline: goalTaglineForDomain(taglineInput, goal.domainId as GoalDomain),
       })),
     })
   } catch (error) {

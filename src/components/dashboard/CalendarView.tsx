@@ -3,7 +3,13 @@
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
 
-type EnergyLevel = 'green' | 'yellow' | 'red'
+interface WorkPreferences {
+  workingWindowStart: number
+  workingWindowEnd: number
+  blockLengthMin: number
+  batching: 'batch' | 'spread'
+  planningCadence: 'daily' | 'weekly' | 'biweekly'
+}
 
 interface CalendarEvent {
   id: string
@@ -19,7 +25,6 @@ interface CalendarEvent {
     name: string
     status: string
     priority: string
-    energyRequired: string
     duration: number
   } | null
 }
@@ -29,14 +34,13 @@ interface UnscheduledTask {
   name: string
   duration: number
   priority: string
-  energyRequired: string
   domainId: string | null
 }
 
 interface Props {
   events: CalendarEvent[]
   unscheduledTasks: UnscheduledTask[]
-  energyMap: Record<number, EnergyLevel> | null
+  workPreferences: WorkPreferences
 }
 
 type CalView = 'day' | 'week' | 'month'
@@ -46,22 +50,14 @@ const DOMAIN_COLORS: Record<string, string> = {
   relationships: '#ec4899', learning: '#3b82f6', legacy: '#8b5cf6',
 }
 
-const ENERGY_BG: Record<EnergyLevel, string> = {
-  green: 'rgba(34,197,94,0.05)',
-  yellow: 'rgba(245,158,11,0.05)',
-  red: 'rgba(239,68,68,0.03)',
-}
-
-const DEFAULT_ENERGY: Record<number, EnergyLevel> = Object.fromEntries(
-  Array.from({ length: 24 }, (_, i) => {
-    if (i >= 9 && i <= 11) return [i, 'green' as EnergyLevel]
-    if (i >= 14 && i <= 16) return [i, 'green' as EnergyLevel]
-    if ((i >= 6 && i <= 8) || (i >= 13 && i <= 17)) return [i, 'yellow' as EnergyLevel]
-    return [i, 'red' as EnergyLevel]
-  })
-)
+// Subtle background tint for hours that fall inside the user's working window.
+const WORKING_WINDOW_BG = 'rgba(99,102,241,0.06)'
 
 const HOURS = Array.from({ length: 18 }, (_, i) => i + 6) // 6am - 11pm
+
+function inWorkingWindow(h: number, wp: WorkPreferences): boolean {
+  return h >= wp.workingWindowStart && h < wp.workingWindowEnd
+}
 
 function formatHour(h: number): string {
   const ampm = h >= 12 ? 'pm' : 'am'
@@ -122,13 +118,11 @@ function eventHeight(event: CalendarEvent): number {
   return Math.max(dur * (52 / 60), 24)
 }
 
-export function CalendarView({ events, unscheduledTasks, energyMap }: Props) {
+export function CalendarView({ events, unscheduledTasks, workPreferences }: Props) {
   const [view, setView] = useState<CalView>('week')
   const [currentDate, setCurrentDate] = useState(new Date())
   const [scheduling, setScheduling] = useState<string | null>(null)
   const [schedulingResult, setSchedulingResult] = useState<string | null>(null)
-
-  const energy = energyMap ?? DEFAULT_ENERGY
 
   const weekDays = useMemo(() => getWeekDays(currentDate), [currentDate])
   const monthDays = useMemo(() => getMonthDays(currentDate.getFullYear(), currentDate.getMonth()), [currentDate])
@@ -209,10 +203,10 @@ export function CalendarView({ events, unscheduledTasks, energyMap }: Props) {
             <MonthView days={monthDays} events={events} todayKey={todayKey} />
           )}
           {view === 'week' && (
-            <WeekView days={weekDays} events={events} energy={energy} todayKey={todayKey} />
+            <WeekView days={weekDays} events={events} workPreferences={workPreferences} todayKey={todayKey} />
           )}
           {view === 'day' && (
-            <DayView day={currentDate} events={events} energy={energy} />
+            <DayView day={currentDate} events={events} workPreferences={workPreferences} />
           )}
         </div>
       </div>
@@ -320,7 +314,7 @@ function MonthView({ days, events, todayKey }: { days: Date[]; events: CalendarE
 
 // ─── Week View ─────────────────────────────────────────────────────────────────
 
-function WeekView({ days, events, energy, todayKey }: { days: Date[]; events: CalendarEvent[]; energy: Record<number, EnergyLevel>; todayKey: string }) {
+function WeekView({ days, events, workPreferences, todayKey }: { days: Date[]; events: CalendarEvent[]; workPreferences: WorkPreferences; todayKey: string }) {
   const WEEKDAYS_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
   return (
@@ -368,7 +362,7 @@ function WeekView({ days, events, energy, todayKey }: { days: Date[]; events: Ca
                   <div key={h} style={{
                     height: 52,
                     borderBottom: '1px solid #141414',
-                    background: ENERGY_BG[energy[h] ?? 'red'],
+                    background: inWorkingWindow(h, workPreferences) ? WORKING_WINDOW_BG : 'transparent',
                   }} />
                 ))}
                 {/* Events */}
@@ -400,12 +394,9 @@ function WeekView({ days, events, energy, todayKey }: { days: Date[]; events: Ca
           })}
         </div>
 
-        {/* Energy Legend */}
+        {/* Working window legend */}
         <div style={{ padding: '8px 12px', display: 'flex', gap: 16, borderTop: '1px solid #141414' }}>
-          <span style={{ fontSize: 10, color: '#555' }}>Energy zones:</span>
-          <span style={{ fontSize: 10, color: '#22c55e' }}>■ Peak</span>
-          <span style={{ fontSize: 10, color: '#f59e0b' }}>■ Good</span>
-          <span style={{ fontSize: 10, color: '#ef4444' }}>■ Rest</span>
+          <span style={{ fontSize: 10, color: '#555' }}>Working window: {formatHour(workPreferences.workingWindowStart)}–{formatHour(workPreferences.workingWindowEnd)} · {workPreferences.blockLengthMin}m blocks · {workPreferences.batching} · {workPreferences.planningCadence}</span>
         </div>
       </div>
     </div>
@@ -414,7 +405,7 @@ function WeekView({ days, events, energy, todayKey }: { days: Date[]; events: Ca
 
 // ─── Day View ──────────────────────────────────────────────────────────────────
 
-function DayView({ day, events, energy }: { day: Date; events: CalendarEvent[]; energy: Record<number, EnergyLevel> }) {
+function DayView({ day, events, workPreferences }: { day: Date; events: CalendarEvent[]; workPreferences: WorkPreferences }) {
   const dayEvents = eventsForDay(events, day)
   const now = new Date()
   const currentHour = now.getHours()
@@ -439,11 +430,11 @@ function DayView({ day, events, energy }: { day: Date; events: CalendarEvent[]; 
         {HOURS.map((h) => (
           <div key={h} style={{
             height: 52, borderBottom: '1px solid #141414',
-            background: ENERGY_BG[energy[h] ?? 'red'],
+            background: inWorkingWindow(h, workPreferences) ? WORKING_WINDOW_BG : 'transparent',
           }}>
-            <span style={{ fontSize: 10, color: energy[h] === 'green' ? '#22c55e44' : energy[h] === 'yellow' ? '#f59e0b44' : '#ef444433', marginLeft: 4, verticalAlign: 'top' }}>
-              {energy[h] === 'green' ? '●' : energy[h] === 'yellow' ? '●' : ''}
-            </span>
+            {inWorkingWindow(h, workPreferences) && (
+              <span style={{ fontSize: 10, color: '#6366f166', marginLeft: 4, verticalAlign: 'top' }}>●</span>
+            )}
           </div>
         ))}
 
@@ -474,7 +465,7 @@ function DayView({ day, events, energy }: { day: Date; events: CalendarEvent[]; 
               </div>
               {e.task && height > 60 && (
                 <div style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
-                  {e.task.priority} · {e.task.duration}m · {e.task.energyRequired} energy
+                  {e.task.priority} · {e.task.duration}m
                 </div>
               )}
             </div>

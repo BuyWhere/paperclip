@@ -169,12 +169,14 @@ within ~30 seconds. Notify the team in Slack (#engineering) after any rollback.
 | Deploying without VERCEL_PROJECT_ID set to the canonical 8os project | Export `VERCEL_PROJECT_ID=prj_ra28Zh8IoehysZsknj1j7DKbqbBw`; the gate warns if the project id is unexpected |
 | Missing env vars in production | Run `vercel env ls` before every deploy |
 | Forgetting to build locally first | Run `npm run build` as part of the checklist (or pass `--skip-build` to the gate) |
+| Using Vercel REST API to deploy without project files (creates broken noop build) | Never use bare Vercel API for deployments. Always `vercel pull` + `npx vercel build` + `npx vercel deploy --prod` from the linked project |
+| Underestimating Vercel SSO protection on new deployments | All new deployments are SSO-protected by default. Use the production env var download approach (`vercel pull`) which bypasses this |
 
 ---
 
 ## RCA reference
 
-This runbook exists to prevent two regression classes:
+This runbook exists to prevent three regression classes:
 
 1. **OS-509** — `vercel --prod` from the wrong directory replaces all
    API routes with 404s. The `pwd` + `vercel project ls` checks prevent
@@ -184,3 +186,9 @@ This runbook exists to prevent two regression classes:
    proxy) ships a broken build to 8os.ai. The pre-deploy smoke gate
    (`scripts/deploy-with-gate.sh`) prevents this — the build is probed
    on a preview URL before it can be promoted.
+3. **OS-1459** — Bare Vercel API deploy without actual project files
+   creates a broken noop build that gets aliased to production. Never use
+   the Vercel REST API to create deployments without including the full
+   project file tree. Always `vercel pull` first to get production env
+   vars, then `npx vercel build` to build, then `npx vercel deploy
+   --prod` to deploy.

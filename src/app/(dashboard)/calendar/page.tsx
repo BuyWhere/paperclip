@@ -9,6 +9,7 @@ import { prisma } from '@/lib/db/prisma'
 import { Sidebar } from '@/components/dashboard/Sidebar'
 import { QuickAdd } from '@/components/dashboard/QuickAdd'
 import { CalendarView } from '@/components/dashboard/CalendarView'
+import { getWorkPreferences } from '@/lib/work-preferences'
 
 async function getUserId(): Promise<string> {
   const cookieStore = await cookies()
@@ -35,22 +36,20 @@ export default async function CalendarPage() {
   const rangeEnd = new Date(now)
   rangeEnd.setDate(rangeEnd.getDate() + 60)
 
-  const [goals, calendarEvents, energyProfileRaw, tasks] = await Promise.all([
+  const [goals, calendarEvents, workPreferences, tasks] = await Promise.all([
     prisma.goal.findMany({ where: { userId, status: 'active' }, select: { id: true, domainId: true, name: true, progress: true } }),
     prisma.calendarEvent.findMany({
       where: { userId, startAt: { gte: rangeStart }, endAt: { lte: rangeEnd } },
-      include: { task: { select: { id: true, name: true, status: true, priority: true, energyRequired: true, duration: true } } },
+      include: { task: { select: { id: true, name: true, status: true, priority: true, duration: true } } },
       orderBy: { startAt: 'asc' },
     }),
-    prisma.energyProfile.findUnique({ where: { userId } }),
+    getWorkPreferences(userId),
     prisma.oSTask.findMany({
       where: { userId, status: 'todo', scheduledAt: null },
       orderBy: [{ priority: 'asc' }, { createdAt: 'asc' }],
       take: 20,
     }),
   ])
-
-  const energyMap = (energyProfileRaw?.hourMap as Record<number, 'green' | 'yellow' | 'red'>) ?? null
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#0a0a0a' }}>
@@ -72,7 +71,6 @@ export default async function CalendarPage() {
               name: e.task.name,
               status: e.task.status,
               priority: e.task.priority,
-              energyRequired: e.task.energyRequired,
               duration: e.task.duration,
             } : null,
           }))}
@@ -81,10 +79,9 @@ export default async function CalendarPage() {
             name: t.name,
             duration: t.duration,
             priority: t.priority,
-            energyRequired: t.energyRequired,
             domainId: t.domainId,
           }))}
-          energyMap={energyMap}
+          workPreferences={workPreferences}
         />
       </main>
 
