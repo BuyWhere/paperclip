@@ -15,6 +15,7 @@ export function Header() {
 
   return (
     <header
+      className="site-header"
       style={{
         position: 'fixed',
         top: 0,
@@ -75,9 +76,10 @@ export function Header() {
         </nav>
 
         {/* CTA */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div className="header-ctas" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <Link
             href="/coming-soon"
+            className="header-reserve-cta"
             onClick={() => posthog.capture('coming_soon_click', { source: 'header' })}
             style={{
               fontSize: '0.8125rem',

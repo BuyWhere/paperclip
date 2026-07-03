@@ -121,8 +121,30 @@ body {
   align-items: center;
 }
 
+.header-ctas {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.header-reserve-cta {
+  white-space: nowrap;
+}
+
 @media (max-width: 640px) {
+  .site-header {
+    padding: 0 1rem;
+  }
+
   .header-nav-links {
     display: none;
+  }
+
+  .header-reserve-cta {
+    display: none;
+  }
+
+  .header-ctas {
+    gap: 0.5rem;
   }
 }
