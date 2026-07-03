@@ -5,6 +5,42 @@
     {
       "source": "/api/waitlist/(.*)",
       "destination": "https://orchestrator-production-1643.up.railway.app/waitlist/$1"
+    },
+    {
+      "source": "/signin",
+      "destination": "/login"
+    },
+    {
+      "source": "/signin/",
+      "destination": "/login"
+    },
+    {
+      "source": "/sign-in",
+      "destination": "/login"
+    },
+    {
+      "source": "/sign-in/",
+      "destination": "/login"
+    },
+    {
+      "source": "/auth/signin",
+      "destination": "/login"
+    },
+    {
+      "source": "/auth/sign-in",
+      "destination": "/login"
+    },
+    {
+      "source": "/sign-up",
+      "destination": "/signup"
+    },
+    {
+      "source": "/sign-up/",
+      "destination": "/signup"
+    },
+    {
+      "source": "/register",
+      "destination": "/signup"
     }
   ]
 }

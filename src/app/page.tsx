@@ -93,24 +93,25 @@ export default function Home() {
           >
             Get Started
           </Link>
+          {/* OS-1173: cross-link to the prelaunch /coming-soon landing page so
+              visitors who want a focused reserve flow (with the affiliate
+              opt-in) have a clear next step beyond the in-page waitlist. */}
           <Link
-            href="#how-it-works"
-            aria-label="See How It Works"
+            href="/coming-soon"
+            aria-label="Reserve your spot for the July 7 launch"
             style={{
-              padding: '1rem 2rem',
-              fontSize: '1.125rem',
-              fontWeight: 600,
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.15)',
-              borderRadius: '12px',
-              color: '#fff',
-              cursor: 'pointer',
-              transition: 'background 0.2s',
+              fontSize: '0.9375rem',
+              fontWeight: 500,
+              color: '#888',
               textDecoration: 'none',
-              display: 'inline-block',
+              padding: '1rem 0.5rem',
+              transition: 'color 0.2s',
             }}
           >
-            See How It Works
+            or{' '}
+            <span style={{ color: '#c4b5fd', textDecoration: 'underline', textUnderlineOffset: '3px' }}>
+              reserve your spot
+            </span>
           </Link>
         </nav>
 
