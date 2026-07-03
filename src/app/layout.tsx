@@ -93,14 +93,14 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareSchema) }}
         />
       </head>
-      <body>
+      <body suppressHydrationWarning>
         {/* Meta Pixel — fires PageView on every route change. Bails out when
             NEXT_PUBLIC_META_PIXEL_ID is unset (local dev, pre-pixel deploys).
             See src/components/MetaPixel.tsx. */}
