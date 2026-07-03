@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
 const FOOTER_LINKS = [
@@ -17,6 +18,9 @@ const SOCIAL_LINKS = [
 ];
 
 export function Footer() {
+  const [year, setYear] = useState('2026')
+  useEffect(() => setYear(String(new Date().getFullYear())), [])
+
   return (
     <footer
       style={{
@@ -206,7 +210,7 @@ export function Footer() {
               color: 'var(--color-text-muted)',
             }}
           >
-            © {new Date().getFullYear()} 8os. All rights reserved.
+            © {year} 8os. All rights reserved.
           </p>
           <p
             style={{

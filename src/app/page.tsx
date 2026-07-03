@@ -706,7 +706,7 @@ export default function Home() {
               fontSize: '0.8rem',
             }}
           >
-            © {new Date().getFullYear()} 8os. All rights reserved.
+            © 2026 8os. All rights reserved.
           </div>
         </div>
       </footer>
