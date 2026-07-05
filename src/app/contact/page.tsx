@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { SidebarNav } from '@/components/SidebarNav';
+import ContactForm from '@/components/ContactForm';
 
 export const metadata: Metadata = {
   title: 'Contact — 8os',
@@ -9,7 +10,8 @@ export const metadata: Metadata = {
 
 const SECTIONS = [
   { id: 'contact-header', label: 'Contact' },
-  { id: 'contact-options', label: 'Contact Options' },
+  { id: 'contact-form', label: 'Message Us' },
+  { id: 'contact-options', label: 'Email Options' },
 ];
 
 export default function ContactPage() {
@@ -38,8 +40,15 @@ export default function ContactPage() {
             </p>
           </section>
 
+          <section id="contact-form" style={{ marginBottom: '3rem' }}>
+            <ContactForm />
+          </section>
+
           <section id="contact-options">
-            <div style={{ display: 'grid', gap: '1.5rem' }}>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1rem' }}>
+              Prefer email?
+            </h2>
+            <div style={{ display: 'grid', gap: '1.5rem', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
               {[
                 {
                   label: 'General enquiries',
