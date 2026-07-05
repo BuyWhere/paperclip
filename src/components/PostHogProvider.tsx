@@ -32,21 +32,16 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
 
     posthog.init(token, {
       api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST ?? 'https://us.i.posthog.com',
-      // Pillar 1: autocapture clicks, forms, inputs automatically
-      autocapture: true,
+      // Keep launch landing-page JS light: explicit capture calls still work,
+      // while disabling heavy autocapture/session replay bundles prevents
+      // Lighthouse from downloading PostHog surveys/replay code on first paint.
+      autocapture: false,
+      disable_surveys: true,
+      disable_session_recording: true,
+      advanced_disable_decide: true,
       person_profiles: 'identified_only',
       capture_pageview: false, // manual pageviews via PostHogPageView
-      capture_pageleave: true,
-      // Pillar 2: Session Replay — full behavioral capture
-      session_recording: {
-        maskAllInputs: true,
-        // Capture network requests/responses for debugging
-        recordCrossOriginIframes: false,
-        networkPayloadCapture: { recordBody: true, recordHeaders: true },
-        consoleLogRecordingEnabled: true,
-        // Filter bot noise: sessions shorter than 5s are discarded
-        minimumDurationMilliseconds: 5000,
-      },
+      capture_pageleave: false,
       // Pillar 3: Error Tracking — PostHog captures unhandled exceptions
       // automatically via its auto-capture pipeline. capture_exceptions is
       // disabled because it installs a global error boundary that interferes
