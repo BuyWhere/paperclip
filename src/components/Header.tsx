@@ -47,6 +47,7 @@ export function Header() {
           {/* Logo */}
           <Link
             href="/"
+            prefetch={false}
             style={{
               fontSize: '1.25rem',
               fontWeight: 800,
@@ -65,6 +66,7 @@ export function Header() {
               <Link
                 key={href}
                 href={href}
+                prefetch={false}
                 style={{
                   fontSize: '0.875rem',
                   fontWeight: 500,
@@ -82,6 +84,7 @@ export function Header() {
           <div className="header-cta-desktop">
             <Link
               href="/coming-soon"
+              prefetch={false}
               onClick={() => posthog.capture('coming_soon_click', { source: 'header' })}
               style={{
                 fontSize: '0.8125rem',
@@ -98,6 +101,7 @@ export function Header() {
             </Link>
             <Link
               href="/quiz"
+              prefetch={false}
               onClick={() => posthog.capture('quiz_start', { source: 'header' })}
               style={{
                 padding: '0.5rem 1.25rem',
@@ -201,6 +205,7 @@ export function Header() {
           >
             <Link
               href="/coming-soon"
+              prefetch={false}
               onClick={() => {
                 posthog.capture('coming_soon_click', { source: 'header_mobile' });
                 setMobileMenuOpen(false);
@@ -217,6 +222,7 @@ export function Header() {
             </Link>
             <Link
               href="/quiz"
+              prefetch={false}
               onClick={() => {
                 posthog.capture('quiz_start', { source: 'header_mobile' });
                 setMobileMenuOpen(false);

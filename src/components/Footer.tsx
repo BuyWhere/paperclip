@@ -53,6 +53,7 @@ export function Footer() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             <Link
               href="/"
+              prefetch={false}
               style={{
                 fontSize: '1.25rem',
                 fontWeight: 800,
@@ -102,6 +103,7 @@ export function Footer() {
                   <Link
                     key={href}
                     href={href}
+                    prefetch={false}
                     style={{
                       fontSize: '0.875rem',
                       color: 'var(--color-text-secondary)',
@@ -133,6 +135,7 @@ export function Footer() {
                   <Link
                     key={href}
                     href={href}
+                    prefetch={false}
                     style={{
                       fontSize: '0.875rem',
                       color: 'var(--color-text-secondary)',
