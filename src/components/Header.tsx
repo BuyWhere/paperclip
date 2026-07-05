@@ -79,21 +79,17 @@ export function Header() {
         {/* CTA */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <Link
-            href="/coming-soon"
+            href="/login"
             prefetch={false}
-            onClick={() => posthog.capture('coming_soon_click', { source: 'header' })}
             style={{
-              fontSize: '0.8125rem',
-              fontWeight: 500,
-              color: 'var(--color-text-muted)',
+              fontSize: '0.875rem',
+              fontWeight: 600,
+              color: 'var(--color-text-secondary)',
               textDecoration: 'none',
               whiteSpace: 'nowrap',
             }}
           >
-            July 7?{' '}
-            <span style={{ color: '#c4b5fd', textDecoration: 'underline', textUnderlineOffset: '2px' }}>
-              Reserve
-            </span>
+            Sign in
           </Link>
           <Link
             href="/quiz"
