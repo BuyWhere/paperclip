@@ -3,28 +3,15 @@
  * Day / Week / Month views with scheduling intelligence.
  * Server component fetches events; client component renders the views.
  */
-import { cookies } from 'next/headers'
-import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/db/prisma'
+import { requireClerkUserId } from '@/lib/auth/clerk'
 import { Sidebar } from '@/components/dashboard/Sidebar'
 import { QuickAdd } from '@/components/dashboard/QuickAdd'
 import { CalendarView } from '@/components/dashboard/CalendarView'
 import { getWorkPreferences } from '@/lib/work-preferences'
 
 async function getUserId(): Promise<string> {
-  const cookieStore = await cookies()
-  const token = cookieStore.get('access_token')?.value
-  if (!token) redirect('/login?next=/calendar')
-  const pem = (process.env.JWT_PUBLIC_KEY ?? '').replace(/\\n/g, '\n')
-  if (!pem) redirect('/login')
-  try {
-    const { importSPKI, jwtVerify } = await import('jose')
-    const key = await importSPKI(pem, 'RS256')
-    const { payload } = await jwtVerify(token, key, { issuer: '8os' })
-    return payload.sub as string
-  } catch {
-    redirect('/login?next=/calendar')
-  }
+  return requireClerkUserId('/calendar')
 }
 
 export default async function CalendarPage() {

@@ -4,7 +4,7 @@
  * Agent Connect: issue a long-lived API key for the authenticated user.
  * The key is a signed HS256 JWT using BETTER_AUTH_SECRET.
  *
- * Requires: authenticated session (access_token cookie).
+ * Requires: authenticated user session.
  *
  * Body (optional):
  *   label  string  human-readable name for the key (max 80 chars)

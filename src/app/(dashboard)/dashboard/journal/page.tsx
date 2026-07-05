@@ -4,31 +4,15 @@
  * Journal is a Pro feature. Free users see an upgrade prompt instead of a
  * silent redirect to /pricing (which was the old broken behaviour).
  */
-import { cookies } from 'next/headers'
-import { redirect } from 'next/navigation'
-import { jwtVerify, importSPKI } from 'jose'
 import { prisma } from '@/lib/db/prisma'
+import { requireClerkUser } from '@/lib/auth/clerk'
 import { Sidebar } from '@/components/dashboard/Sidebar'
 import Link from 'next/link'
 
 type UserRole = 'user' | 'premium' | 'pro' | 'admin'
 
 async function getUser(): Promise<{ userId: string; role: UserRole }> {
-  const cookieStore = await cookies()
-  const token = cookieStore.get('access_token')?.value
-  if (!token) redirect('/login?next=/dashboard/journal')
-  const pem = (process.env.JWT_PUBLIC_KEY ?? '').replace(/\\n/g, '\n')
-  if (!pem) redirect('/login')
-  try {
-    const key = await importSPKI(pem, 'RS256')
-    const { payload } = await jwtVerify(token, key, { issuer: '8os' })
-    return {
-      userId: payload.sub as string,
-      role: (payload.role as UserRole) ?? 'user',
-    }
-  } catch {
-    redirect('/login?next=/dashboard/journal')
-  }
+  return requireClerkUser('/dashboard/journal')
 }
 
 export default async function JournalPage() {

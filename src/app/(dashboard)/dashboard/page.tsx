@@ -2,10 +2,8 @@
  * /dashboard — JWT-protected dashboard page (Task 6)
  * Server component: fetches real data, renders responsive grid.
  */
-import { cookies } from 'next/headers'
-import { redirect } from 'next/navigation'
-import { jwtVerify, importSPKI } from 'jose'
 import { prisma } from '@/lib/db/prisma'
+import { requireClerkUserId } from '@/lib/auth/clerk'
 import { orderTasksByWorkPrefs } from '@/lib/scheduling/engine'
 import { getWorkPreferences } from '@/lib/work-preferences'
 import { Sidebar } from '@/components/dashboard/Sidebar'
@@ -37,20 +35,7 @@ const ARCHETYPE_DENSITY: Record<string, { cols: number; gapPx: number }> = {
 type InsightPriority = 'high' | 'medium' | 'low'
 
 async function getUserId(): Promise<string> {
-  const cookieStore = await cookies()
-  const token = cookieStore.get('access_token')?.value
-  if (!token) redirect('/login?next=/dashboard')
-
-  const pem = (process.env.JWT_PUBLIC_KEY ?? '').replace(/\\n/g, '\n')
-  if (!pem) redirect('/login')
-
-  try {
-    const key = await importSPKI(pem, 'RS256')
-    const { payload } = await jwtVerify(token, key, { issuer: '8os' })
-    return payload.sub as string
-  } catch {
-    redirect('/login?next=/dashboard')
-  }
+  return requireClerkUserId('/dashboard')
 }
 
 export default async function DashboardPage() {

@@ -2,29 +2,16 @@
  * /goals/[id] — Goal Detail View (Task 7)
  * Header, projects list, tasks list with filter/sort, calendar timeline, activity log.
  */
-import { cookies } from 'next/headers'
 import { redirect, notFound } from 'next/navigation'
 import { prisma } from '@/lib/db/prisma'
+import { requireClerkUserId } from '@/lib/auth/clerk'
 import { Sidebar } from '@/components/dashboard/Sidebar'
 import { ProgressRing } from '@/components/dashboard/ProgressRing'
 import { QuickAdd } from '@/components/dashboard/QuickAdd'
 import Link from 'next/link'
 
-// We re-use the same auth helper pattern
 async function getUserId(): Promise<string> {
-  const cookieStore = await cookies()
-  const token = cookieStore.get('access_token')?.value
-  if (!token) redirect('/login')
-  const pem = (process.env.JWT_PUBLIC_KEY ?? '').replace(/\\n/g, '\n')
-  if (!pem) redirect('/login')
-  try {
-    const { importSPKI: imp, jwtVerify: ver } = await import('jose')
-    const key = await imp(pem, 'RS256')
-    const { payload } = await ver(token, key, { issuer: '8os' })
-    return payload.sub as string
-  } catch {
-    redirect('/login')
-  }
+  return requireClerkUserId('/goals')
 }
 
 const DOMAIN_COLORS: Record<string, string> = {

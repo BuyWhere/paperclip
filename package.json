@@ -16,6 +16,7 @@
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
+    "@clerk/nextjs": "^6.39.5",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "@sentry/nextjs": "^10.51.0",
@@ -56,7 +57,6 @@
     "testEnvironment": "node",
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/src/$1",
-      "^jose$": "<rootDir>/src/__mocks__/jose.js",
       "^uuid$": "<rootDir>/src/__mocks__/uuid.js"
     },
     "testMatch": [

@@ -1,9 +1,8 @@
 /**
  * /goals — Goals list page
  */
-import { cookies } from 'next/headers'
-import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/db/prisma'
+import { requireClerkUserId } from '@/lib/auth/clerk'
 import { Sidebar } from '@/components/dashboard/Sidebar'
 import { ProgressRing } from '@/components/dashboard/ProgressRing'
 import { QuickAdd } from '@/components/dashboard/QuickAdd'
@@ -11,19 +10,7 @@ import { goalTaglineForDomain, type GoalDomain } from '@/lib/goal-taglines'
 import Link from 'next/link'
 
 async function getUserId(): Promise<string> {
-  const cookieStore = await cookies()
-  const token = cookieStore.get('access_token')?.value
-  if (!token) redirect('/login?next=/goals')
-  const pem = (process.env.JWT_PUBLIC_KEY ?? '').replace(/\\n/g, '\n')
-  if (!pem) redirect('/login')
-  try {
-    const { importSPKI, jwtVerify } = await import('jose')
-    const key = await importSPKI(pem, 'RS256')
-    const { payload } = await jwtVerify(token, key, { issuer: '8os' })
-    return payload.sub as string
-  } catch {
-    redirect('/login?next=/goals')
-  }
+  return requireClerkUserId('/goals')
 }
 
 const DOMAIN_COLORS: Record<string, string> = {

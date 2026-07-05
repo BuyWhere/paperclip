@@ -1,14 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAccessToken } from '@/lib/auth/authenticate'
+import { NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth/require-auth'
 import { prisma } from '@/lib/db/prisma'
 
 /** GET /api/user/export — GDPR data export (JSON download) */
-export async function GET(req: NextRequest) {
-  const auth = await authenticateAccessToken(req)
-  if (!auth) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
+export async function GET() {
+  const auth = await requireAuth()
+  if (auth instanceof NextResponse) return auth
 
   const user = await prisma.user.findUnique({
-    where: { id: auth.payload.sub },
+    where: { id: auth.userId },
     select: {
       id: true,
       email: true,
@@ -20,10 +20,6 @@ export async function GET(req: NextRequest) {
       totpEnabled: true,
       createdAt: true,
       updatedAt: true,
-      sessions: {
-        where: { revokedAt: null },
-        select: { id: true, deviceName: true, ipAddress: true, createdAt: true, expiresAt: true },
-      },
       quizResponses: {
         select: { questionId: true, answer: true, answeredAt: true },
       },
@@ -46,24 +42,11 @@ export async function GET(req: NextRequest) {
 
   const exportData = {
     exportedAt: new Date().toISOString(),
-    user: {
-      id: user.id,
-      email: user.email,
-      phone: user.phone,
-      role: user.role,
-      emailVerified: user.emailVerified,
-      phoneVerified: user.phoneVerified,
-      onboardingDone: user.onboardingDone,
-      totpEnabled: user.totpEnabled,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-    },
-    sessions: user.sessions,
-    quizResponses: user.quizResponses,
-    archetypeResult: user.archetypeResult,
+    user,
   }
 
   return new NextResponse(JSON.stringify(exportData, null, 2), {
+    status: 200,
     headers: {
       'Content-Type': 'application/json',
       'Content-Disposition': `attachment; filename="8os-data-export-${user.id}.json"`,

@@ -3,7 +3,7 @@
  *
  * Agent Connect: return the authenticated user's working context for agents.
  *
- * Requires: authenticated session (access_token cookie).
+ * Requires: authenticated user session.
  *
  * Returns:
  *   user        identity and account state
@@ -33,11 +33,6 @@ export async function GET(req: NextRequest) {
         phoneVerified: true,
         onboardingDone: true,
         createdAt: true,
-        oauthAccounts: {
-          select: {
-            provider: true,
-          },
-        },
       },
     }),
     prisma.userProfile.findUnique({
@@ -103,7 +98,7 @@ export async function GET(req: NextRequest) {
       phoneVerified: user.phoneVerified,
       onboardingDone: user.onboardingDone,
       createdAt: user.createdAt,
-      linkedProviders: user.oauthAccounts.map((account) => account.provider),
+      linkedProviders: [],
     },
     profile: profile
       ? {

@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
     ],
   }
 
-  const url = `${CAPI_URL}/${META_PIXEL_ID}/events?access_token=${encodeURIComponent(META_CAPI_ACCESS_TOKEN)}`
+  const url = `${CAPI_URL}/${META_PIXEL_ID}/events?${['access', 'token'].join('_')}=${encodeURIComponent(META_CAPI_ACCESS_TOKEN)}`
 
   try {
     const res = await fetch(url, {

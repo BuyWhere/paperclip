@@ -1,28 +1,15 @@
 /**
  * /dashboard/archetype — Archetype profile page
  */
-import { cookies } from 'next/headers'
-import { redirect } from 'next/navigation'
-import { jwtVerify, importSPKI } from 'jose'
 import { prisma } from '@/lib/db/prisma'
+import { requireClerkUserId } from '@/lib/auth/clerk'
 import { Sidebar } from '@/components/dashboard/Sidebar'
 import Link from 'next/link'
 import { ArchetypeContent } from '@/components/dashboard/ArchetypeContent'
 import { pageMainStyle, pageShellStyle } from '@/components/dashboard/page-style'
 
 async function getUserId(): Promise<string> {
-  const cookieStore = await cookies()
-  const token = cookieStore.get('access_token')?.value
-  if (!token) redirect('/login?next=/dashboard/archetype')
-  const pem = (process.env.JWT_PUBLIC_KEY ?? '').replace(/\\n/g, '\n')
-  if (!pem) redirect('/login')
-  try {
-    const key = await importSPKI(pem, 'RS256')
-    const { payload } = await jwtVerify(token, key, { issuer: '8os' })
-    return payload.sub as string
-  } catch {
-    redirect('/login?next=/dashboard/archetype')
-  }
+  return requireClerkUserId('/dashboard/archetype')
 }
 
 export default async function ArchetypePage() {

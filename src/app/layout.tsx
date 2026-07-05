@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Suspense } from 'react'
+import { ClerkProvider } from '@clerk/nextjs'
 import { PostHogProvider } from '@/components/PostHogProvider'
 import { MetaPixel } from '@/components/MetaPixel'
 import { Header } from '@/components/Header'
@@ -101,20 +101,22 @@ export default function RootLayout({
         />
       </head>
       <body suppressHydrationWarning>
-        {/* Meta Pixel — fires PageView on every route change. Bails out when
-            NEXT_PUBLIC_META_PIXEL_ID is unset (local dev, pre-pixel deploys).
-            See src/components/MetaPixel.tsx. */}
-        <MetaPixel />
-        <a href="#main-content" className="skip-link">
-          Skip to content
-        </a>
-        <Header />
-        <div id="main-content" tabIndex={-1}>
-          <PostHogProvider>
-            {children}
-          </PostHogProvider>
-        </div>
-        <Footer />
+        <ClerkProvider>
+          {/* Meta Pixel — fires PageView on every route change. Bails out when
+              NEXT_PUBLIC_META_PIXEL_ID is unset (local dev, pre-pixel deploys).
+              See src/components/MetaPixel.tsx. */}
+          <MetaPixel />
+          <a href="#main-content" className="skip-link">
+            Skip to content
+          </a>
+          <Header />
+          <div id="main-content" tabIndex={-1}>
+            <PostHogProvider>
+              {children}
+            </PostHogProvider>
+          </div>
+          <Footer />
+        </ClerkProvider>
       </body>
     </html>
   )

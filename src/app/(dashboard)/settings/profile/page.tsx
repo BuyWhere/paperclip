@@ -1,9 +1,8 @@
 'use client'
 
-import { useState, useEffect, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { GoogleAuthButton } from '@/components/auth/GoogleAuthButton'
 
 interface UserProfile {
   id: string
@@ -13,133 +12,25 @@ interface UserProfile {
   emailVerified: boolean
   phoneVerified: boolean
   onboardingDone: boolean
-  totpEnabled: boolean
   createdAt: string
-  linkedProviders: string[]
-}
-
-interface Session {
-  id: string
-  deviceName: string | null
-  ipAddress: string | null
-  userAgent: string | null
-  createdAt: string
-  expiresAt: string
-  current?: boolean
 }
 
 export default function ProfileSettingsPage() {
   const router = useRouter()
   const [user, setUser] = useState<UserProfile | null>(null)
-  const [sessions, setSessions] = useState<Session[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [sessionMsg, setSessionMsg] = useState('')
-
-  // TOTP setup state
-  const [totpStep, setTotpStep] = useState<'idle' | 'setup' | 'confirm'>('idle')
-  const [totpSecret, setTotpSecret] = useState('')
-  const [totpQr, setTotpQr] = useState('')
-  const [totpCode, setTotpCode] = useState('')
-  const [totpMsg, setTotpMsg] = useState('')
-
-  // Delete account state
   const [deleteConfirm, setDeleteConfirm] = useState(false)
-  const [deletePassword, setDeletePassword] = useState('')
+  const [deletePhrase, setDeletePhrase] = useState('')
   const [deleteMsg, setDeleteMsg] = useState('')
 
   useEffect(() => {
-    Promise.all([
-      fetch('/api/user/profile').then((r) => r.json()),
-      fetch('/api/user/sessions').then((r) => r.json()),
-    ])
-      .then(([profileData, sessionsData]) => {
-        setUser(profileData.user)
-        setSessions(sessionsData.sessions ?? [])
-      })
+    fetch('/api/user/profile')
+      .then((res) => res.json())
+      .then((data) => setUser(data.user))
       .catch(() => setError('Failed to load profile'))
       .finally(() => setLoading(false))
   }, [])
-
-  async function startTotpSetup() {
-    setTotpMsg('')
-    const res = await fetch('/api/auth/totp')
-    const data = await res.json()
-    if (!res.ok) {
-      setTotpMsg(data.error ?? 'Failed to start 2FA setup')
-      return
-    }
-    setTotpSecret(data.secret)
-    setTotpQr(data.qrDataUrl)
-    setTotpStep('setup')
-  }
-
-  async function confirmTotp(e: FormEvent) {
-    e.preventDefault()
-    const res = await fetch('/api/auth/totp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: totpCode }),
-    })
-    const data = await res.json()
-    if (!res.ok) {
-      setTotpMsg(data.error ?? 'Invalid code')
-      return
-    }
-    setTotpMsg('2FA enabled successfully!')
-    setTotpStep('idle')
-    setUser((u) => u ? { ...u, totpEnabled: true } : u)
-  }
-
-  async function disableTotp(e: FormEvent) {
-    e.preventDefault()
-    const res = await fetch('/api/auth/totp', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: totpCode }),
-    })
-    const data = await res.json()
-    if (!res.ok) {
-      setTotpMsg(data.error ?? 'Invalid code')
-      return
-    }
-    setTotpMsg('2FA disabled.')
-    setTotpStep('idle')
-    setTotpCode('')
-    setUser((u) => u ? { ...u, totpEnabled: false } : u)
-  }
-
-  async function revokeSession(sessionId: string) {
-    setSessionMsg('')
-    const res = await fetch(`/api/user/sessions?id=${sessionId}`, { method: 'DELETE' })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) {
-      setSessionMsg(data.error ?? 'Failed to revoke session')
-      return
-    }
-
-    if (data.currentSessionRevoked) {
-      router.push('/login')
-      return
-    }
-
-    setSessions((ss) => ss.filter((s) => s.id !== sessionId))
-    setSessionMsg(data.message ?? 'Session revoked')
-  }
-
-  async function revokeAllSessions() {
-    setSessionMsg('')
-    const res = await fetch('/api/user/sessions', { method: 'DELETE' })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) {
-      setSessionMsg(data.error ?? 'Failed to revoke sessions')
-      return
-    }
-
-    if (data.currentSessionRevoked) {
-      router.push('/login')
-    }
-  }
 
   async function handleExport() {
     window.location.href = '/api/user/export'
@@ -151,7 +42,7 @@ export default function ProfileSettingsPage() {
     const res = await fetch('/api/user/delete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: deletePassword }),
+      body: JSON.stringify({ confirmation: deletePhrase }),
     })
     const data = await res.json()
     if (!res.ok) {
@@ -174,7 +65,6 @@ export default function ProfileSettingsPage() {
           <h1 style={styles.title}>Account settings</h1>
         </div>
 
-        {/* Profile info */}
         <section style={styles.section}>
           <h2 style={styles.sectionTitle}>Profile</h2>
           <div style={styles.row}>
@@ -196,124 +86,22 @@ export default function ProfileSettingsPage() {
         </section>
 
         <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>Connected accounts</h2>
-          <p style={{ color: '#999', fontSize: '0.875rem', marginTop: 0 }}>
-            Link Google to this account to keep phone-based onboarding and Google sign-in on the same identity.
+          <h2 style={styles.sectionTitle}>Sign-in security</h2>
+          <p style={{ color: '#999', fontSize: '0.875rem', margin: 0 }}>
+            Authentication, active sessions, connected accounts, and MFA are now managed by Clerk.
           </p>
-          <div style={styles.row}>
-            <span style={styles.label}>Google</span>
-            <span style={styles.value}>{user.linkedProviders.includes('google') ? 'Connected' : 'Not connected'}</span>
-          </div>
-          {!user.linkedProviders.includes('google') && (
-            <div style={{ marginTop: '1rem' }}>
-              <GoogleAuthButton href="/api/auth/google?mode=link&next=/settings/profile" label="Connect Google" />
-            </div>
-          )}
         </section>
 
-        {/* 2FA / TOTP */}
-        <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>Two-factor authentication</h2>
-          {totpMsg && <p style={{ color: user.totpEnabled ? '#6bff6b' : '#ff6b6b', fontSize: '0.875rem' }}>{totpMsg}</p>}
-
-          {user.totpEnabled ? (
-            <>
-              <p style={{ color: '#999', fontSize: '0.875rem' }}>2FA is enabled on your account.</p>
-              {totpStep === 'idle' && (
-                <button onClick={() => setTotpStep('confirm')} style={styles.dangerBtn}>Disable 2FA</button>
-              )}
-              {totpStep === 'confirm' && (
-                <form onSubmit={disableTotp} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.75rem' }}>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={totpCode}
-                    onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    placeholder="6-digit code"
-                    maxLength={6}
-                    style={{ ...styles.input, width: '140px' }}
-                  />
-                  <button type="submit" style={styles.dangerBtn}>Confirm disable</button>
-                  <button type="button" onClick={() => setTotpStep('idle')} style={styles.ghostBtn}>Cancel</button>
-                </form>
-              )}
-            </>
-          ) : (
-            <>
-              <p style={{ color: '#999', fontSize: '0.875rem' }}>Protect your account with an authenticator app.</p>
-              {totpStep === 'idle' && (
-                <button onClick={startTotpSetup} style={styles.btn}>Enable 2FA</button>
-              )}
-              {totpStep === 'setup' && (
-                <div style={{ marginTop: '1rem' }}>
-                  <p style={{ color: '#ccc', fontSize: '0.875rem' }}>Scan this QR code with your authenticator app:</p>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={totpQr} alt="TOTP QR code" style={{ width: 180, height: 180, margin: '1rem 0' }} />
-                  <p style={{ color: '#666', fontSize: '0.75rem', wordBreak: 'break-all' }}>
-                    Manual key: <code>{totpSecret}</code>
-                  </p>
-                  <form onSubmit={confirmTotp} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.75rem' }}>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={totpCode}
-                      onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                      placeholder="6-digit code"
-                      maxLength={6}
-                      style={{ ...styles.input, width: '140px' }}
-                    />
-                    <button type="submit" disabled={totpCode.length !== 6} style={styles.btn}>Verify & enable</button>
-                    <button type="button" onClick={() => setTotpStep('idle')} style={styles.ghostBtn}>Cancel</button>
-                  </form>
-                </div>
-              )}
-            </>
-          )}
-        </section>
-
-        {/* Sessions */}
-        <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>Active sessions</h2>
-          {sessionMsg && <p style={{ color: '#ffb86b', fontSize: '0.875rem' }}>{sessionMsg}</p>}
-          {sessions.length === 0 ? (
-            <p style={{ color: '#666', fontSize: '0.875rem' }}>No active sessions found.</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {sessions.map((s) => (
-                <div key={s.id} style={styles.sessionRow}>
-                  <div>
-                    <p style={{ margin: 0, color: '#ededed', fontSize: '0.875rem' }}>
-                      {s.deviceName ?? s.userAgent?.slice(0, 60) ?? 'Unknown device'}
-                      {s.current ? ' (current)' : ''}
-                    </p>
-                    <p style={{ margin: '0.25rem 0 0', color: '#666', fontSize: '0.75rem' }}>
-                      {s.ipAddress ?? 'IP unavailable'} · Since {new Date(s.createdAt).toLocaleDateString()} · Expires {new Date(s.expiresAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <button onClick={() => revokeSession(s.id)} style={styles.smallDangerBtn}>
-                    {s.current ? 'Sign out' : 'Revoke'}
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          <button onClick={revokeAllSessions} style={{ ...styles.dangerBtn, marginTop: '1rem' }}>
-            Sign out all devices
-          </button>
-        </section>
-
-        {/* Data export */}
         <section style={styles.section}>
           <h2 style={styles.sectionTitle}>Your data</h2>
           <p style={{ color: '#999', fontSize: '0.875rem' }}>Download a copy of all data we have stored about you.</p>
           <button onClick={handleExport} style={styles.btn}>Export data (JSON)</button>
         </section>
 
-        {/* Account deletion */}
         <section style={{ ...styles.section, borderColor: '#3d1a1a' }}>
           <h2 style={{ ...styles.sectionTitle, color: '#ff6b6b' }}>Delete account</h2>
           <p style={{ color: '#999', fontSize: '0.875rem' }}>
-            Permanently remove your account and all associated data. This action cannot be undone.
+            Permanently remove your local 8OS account data. Type DELETE to confirm.
           </p>
           {!deleteConfirm ? (
             <button onClick={() => setDeleteConfirm(true)} style={styles.dangerBtn}>Delete my account</button>
@@ -321,12 +109,11 @@ export default function ProfileSettingsPage() {
             <form onSubmit={handleDelete} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.75rem' }}>
               {deleteMsg && <p style={{ color: '#ff6b6b', fontSize: '0.875rem', margin: 0 }}>{deleteMsg}</p>}
               <input
-                type="password"
-                value={deletePassword}
-                onChange={(e) => setDeletePassword(e.target.value)}
-                placeholder="Enter your password to confirm"
+                type="text"
+                value={deletePhrase}
+                onChange={(e) => setDeletePhrase(e.target.value)}
+                placeholder="Type DELETE"
                 required
-                autoComplete="current-password"
                 style={styles.input}
               />
               <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -356,6 +143,4 @@ const styles: Record<string, React.CSSProperties> = {
   btn: { background: '#ededed', color: '#0a0a0a', border: 'none', borderRadius: '8px', padding: '0.625rem 1.25rem', fontSize: '0.9rem', fontWeight: '600', cursor: 'pointer' },
   dangerBtn: { background: '#3d1a1a', color: '#ff6b6b', border: '1px solid #5c2020', borderRadius: '8px', padding: '0.625rem 1.25rem', fontSize: '0.9rem', fontWeight: '600', cursor: 'pointer' },
   ghostBtn: { background: 'none', color: '#666', border: '1px solid #333', borderRadius: '8px', padding: '0.625rem 1rem', fontSize: '0.9rem', cursor: 'pointer' },
-  sessionRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', background: '#0a0a0a', borderRadius: '8px', border: '1px solid #1a1a1a' },
-  smallDangerBtn: { background: 'none', color: '#ff6b6b', border: '1px solid #3d1a1a', borderRadius: '6px', padding: '0.375rem 0.75rem', fontSize: '0.8rem', cursor: 'pointer' },
 }

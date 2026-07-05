@@ -1,27 +1,14 @@
 /**
  * /dashboard/archetype/compare — Compare all archetypes
  */
-import { cookies } from 'next/headers'
-import { redirect } from 'next/navigation'
-import { jwtVerify, importSPKI } from 'jose'
 import { prisma } from '@/lib/db/prisma'
+import { requireClerkUserId } from '@/lib/auth/clerk'
 import { Sidebar } from '@/components/dashboard/Sidebar'
 import { ARCHETYPES } from '@/lib/archetype'
 import Link from 'next/link'
 
 async function getUserId(): Promise<string> {
-  const cookieStore = await cookies()
-  const token = cookieStore.get('access_token')?.value
-  if (!token) redirect('/login?next=/dashboard/archetype/compare')
-  const pem = (process.env.JWT_PUBLIC_KEY ?? '').replace(/\\n/g, '\n')
-  if (!pem) redirect('/login')
-  try {
-    const key = await importSPKI(pem, 'RS256')
-    const { payload } = await jwtVerify(token, key, { issuer: '8os' })
-    return payload.sub as string
-  } catch {
-    redirect('/login?next=/dashboard/archetype/compare')
-  }
+  return requireClerkUserId('/dashboard/archetype/compare')
 }
 
 export default async function CompareArchetypesPage() {

@@ -1,17 +1,17 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAccessToken } from './authenticate'
+import { NextResponse } from 'next/server'
+import { auth } from '@clerk/nextjs/server'
 
 /**
- * Extract and verify the access token from cookie.
+ * Verify the current Clerk session.
  * Returns { userId } on success, or a NextResponse error to return immediately.
  */
 export async function requireAuth(
-  req: NextRequest,
-): Promise<{ ok: true; userId: string; sessionId: string } | NextResponse> {
-  const auth = await authenticateAccessToken(req)
-  if (!auth) {
+  ..._args: unknown[]
+): Promise<{ ok: true; userId: string } | NextResponse> {
+  const session = await auth()
+  if (!session.userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  return { ok: true, userId: auth.payload.sub, sessionId: auth.payload.sessionId }
+  return { ok: true, userId: session.userId }
 }

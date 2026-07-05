@@ -51,10 +51,6 @@ model User {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  sessions          Session[]
-  otpCodes          OtpCode[]
-  passwordResets    PasswordReset[]
-  oauthAccounts     OauthAccount[]
   profile           UserProfile?
   quizResponses     QuizResponse[]
   archetypeResult   ArchetypeResult?
@@ -211,69 +207,6 @@ model ArchetypeResult {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("archetype_results")
-}
-
-model Session {
-  id           String    @id @default(uuid())
-  userId       String
-  deviceName   String?
-  ipAddress    String?
-  userAgent    String?
-  refreshToken String    @unique
-  expiresAt    DateTime
-  revokedAt    DateTime?
-  createdAt    DateTime  @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@map("sessions")
-}
-
-model OtpCode {
-  id        String     @id @default(uuid())
-  userId    String
-  code      String
-  channel   OtpChannel
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime   @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@map("otp_codes")
-}
-
-model PasswordReset {
-  id           String    @id @default(uuid())
-  userId       String
-  tokenHash    String    @unique
-  expiresAt    DateTime
-  usedAt       DateTime?
-  createdAt    DateTime  @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@map("password_resets")
-}
-
-model OauthAccount {
-  id           String    @id @default(uuid())
-  userId       String
-  provider     String
-  providerUid  String
-  accessToken  String?
-  refreshToken String?
-  expiresAt    DateTime?
-  createdAt    DateTime  @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerUid])
-  @@index([userId])
-  @@map("oauth_accounts")
 }
 
 // ─── Wave 2: Goals, Projects, Tasks, Calendar ─────────────────────────────────
