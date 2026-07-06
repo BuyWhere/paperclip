@@ -126,3 +126,27 @@ body {
     display: none;
   }
 }
+
+/* Header CTA — hidden on mobile (OS-2751) */
+.header-cta-desktop {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* Header hamburger — hidden on desktop, shown on mobile (OS-2751) */
+.header-hamburger {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .header-cta-desktop {
+    display: none;
+  }
+
+  .header-hamburger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
