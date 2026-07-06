@@ -4,6 +4,8 @@ import { FormEvent, useState } from 'react'
 
 type Status = 'idle' | 'loading' | 'success' | 'error'
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 interface ComingSoonFormProps {
   // The /coming-soon page is the canonical prelaunch URL. Other 8os.ai
   // surfaces (homepage hero, /how-it-works, /pricing, /quiz) embed this
@@ -25,8 +27,30 @@ export default function ComingSoonForm({
   const [message, setMessage] = useState('')
   const [position, setPosition] = useState<number | null>(null)
 
+  const validateEmail = () => {
+    const trimmedEmail = email.trim()
+
+    if (!trimmedEmail) {
+      return 'Please enter your email address.'
+    }
+
+    if (!EMAIL_PATTERN.test(trimmedEmail)) {
+      return 'Please enter a valid email address.'
+    }
+
+    return ''
+  }
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
+    const validationError = validateEmail()
+
+    if (validationError) {
+      setStatus('error')
+      setMessage(validationError)
+      return
+    }
+
     setStatus('loading')
     setMessage('')
 
@@ -119,7 +143,7 @@ export default function ComingSoonForm({
 
   return (
     <div data-testid="coming-soon-form" style={cardStyle}>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      <form noValidate onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
         <div>
           <label
             htmlFor="coming-soon-email"
@@ -140,21 +164,43 @@ export default function ComingSoonForm({
             type="email"
             placeholder="you@example.com"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value)
+              if (status === 'error') {
+                setStatus('idle')
+                setMessage('')
+              }
+            }}
             required
             autoComplete="email"
+            aria-invalid={status === 'error' ? 'true' : 'false'}
+            aria-describedby={status === 'error' ? 'coming-soon-email-error' : undefined}
             style={{
               width: '100%',
               padding: '0.875rem 1rem',
               fontSize: '1rem',
               background: 'rgba(0,0,0,0.4)',
-              border: '1px solid rgba(255,255,255,0.1)',
+              border: status === 'error' ? '2px solid #ef4444' : '1px solid rgba(255,255,255,0.1)',
               borderRadius: '8px',
               color: '#fff',
               outline: 'none',
               boxSizing: 'border-box',
             }}
           />
+          {status === 'error' && (
+            <p
+              id="coming-soon-email-error"
+              role="alert"
+              style={{
+                margin: '0.5rem 0 0',
+                color: '#f87171',
+                fontSize: '0.875rem',
+                lineHeight: 1.4,
+              }}
+            >
+              {message}
+            </p>
+          )}
         </div>
 
         <label
@@ -210,7 +256,7 @@ export default function ComingSoonForm({
         </button>
       </form>
 
-      {status === 'error' && (
+      {status === 'error' && message !== 'Please enter your email address.' && message !== 'Please enter a valid email address.' && (
         <p
           role="alert"
           style={{
