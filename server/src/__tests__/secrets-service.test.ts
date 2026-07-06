@@ -1913,4 +1913,26 @@ describeEmbeddedPostgres("secretService", () => {
       /not active/i,
     );
   });
+
+  it("wraps local encrypted decrypt failures as provider errors", async () => {
+    const companyId = await seedCompany();
+    const svc = secretService(db);
+    const secret = await svc.create(companyId, {
+      name: `wrong-key-${randomUUID()}`,
+      provider: "local_encrypted",
+      value: "runtime-secret",
+    });
+
+    process.env.PAPERCLIP_SECRETS_MASTER_KEY = "b".repeat(64);
+    try {
+      await expect(svc.resolveSecretValue(companyId, secret.id, "latest")).rejects.toMatchObject({
+        code: "provider_error",
+        provider: "local_encrypted",
+        operation: "resolveVersion",
+        message: expect.stringContaining("Secret decryption failed"),
+      });
+    } finally {
+      delete process.env.PAPERCLIP_SECRETS_MASTER_KEY;
+    }
+  });
 });

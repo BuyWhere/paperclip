@@ -10,6 +10,7 @@ import type {
   StoredSecretVersionMaterial,
 } from "./types.js";
 import { badRequest } from "../errors.js";
+import { SecretProviderClientError } from "./types.js";
 
 interface LocalEncryptedMaterial extends StoredSecretVersionMaterial {
   scheme: "local_encrypted_v1";
@@ -93,6 +94,10 @@ function enforceKeyFilePermissionsBestEffort(keyPath: string) {
 
 function sha256Hex(value: string): string {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function masterKeyFingerprint(masterKey: Buffer): string {
+  return createHash("sha256").update(masterKey).digest("hex").slice(0, 12);
 }
 
 function prepareManagedVersion(value: string): PreparedSecretVersion {
@@ -206,13 +211,27 @@ function encryptValue(masterKey: Buffer, value: string): LocalEncryptedMaterial 
 }
 
 function decryptValue(masterKey: Buffer, material: LocalEncryptedMaterial): string {
-  const iv = Buffer.from(material.iv, "base64");
-  const tag = Buffer.from(material.tag, "base64");
-  const ciphertext = Buffer.from(material.ciphertext, "base64");
-  const decipher = createDecipheriv("aes-256-gcm", masterKey, iv);
-  decipher.setAuthTag(tag);
-  const plain = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
-  return plain.toString("utf8");
+  try {
+    const iv = Buffer.from(material.iv, "base64");
+    const tag = Buffer.from(material.tag, "base64");
+    const ciphertext = Buffer.from(material.ciphertext, "base64");
+    const decipher = createDecipheriv("aes-256-gcm", masterKey, iv);
+    decipher.setAuthTag(tag);
+    const plain = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+    return plain.toString("utf8");
+  } catch (error) {
+    const originalMessage = error instanceof Error ? error.message : String(error);
+    throw new SecretProviderClientError({
+      code: "provider_error",
+      provider: "local_encrypted",
+      operation: "resolveVersion",
+      message:
+        `Secret decryption failed (master key fingerprint: ${masterKeyFingerprint(masterKey)}). ` +
+        "This usually means the master key does not match the key used to encrypt the secret. " +
+        `Original error: ${originalMessage}`,
+      cause: error,
+    });
+  }
 }
 
 function asLocalEncryptedMaterial(value: StoredSecretVersionMaterial): LocalEncryptedMaterial {
