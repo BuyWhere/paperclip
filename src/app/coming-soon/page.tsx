@@ -89,10 +89,7 @@ export default function ComingSoonPage() {
             fontWeight: 800,
             letterSpacing: '-0.03em',
             marginBottom: '1.25rem',
-            background: 'linear-gradient(135deg, #fff 0%, #999 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
+            color: 'var(--color-text-primary)',
             lineHeight: 1.1,
             textAlign: 'center',
           }}
@@ -174,7 +171,7 @@ export default function ComingSoonPage() {
               >
                 {card.title}
               </h3>
-              <p style={{ fontSize: '0.85rem', color: '#888', lineHeight: 1.5, margin: 0 }}>
+              <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', lineHeight: 1.5, margin: 0 }}>
                 {card.body}
               </p>
             </div>
