@@ -22,7 +22,7 @@ export default function ComingSoonForm({
   archetype,
 }: ComingSoonFormProps) {
   const [email, setEmail] = useState('')
-  const [affiliateOptIn, setAffiliateOptIn] = useState(true)
+  const [affiliateOptIn, setAffiliateOptIn] = useState(false)
   const [status, setStatus] = useState<Status>('idle')
   const [message, setMessage] = useState('')
   const [position, setPosition] = useState<number | null>(null)
@@ -229,8 +229,9 @@ export default function ComingSoonForm({
             }}
           />
           <span style={{ fontSize: '0.9rem', color: '#d4d4d4', lineHeight: 1.5 }}>
-            <strong style={{ color: '#fff' }}>Join the affiliate program.</strong> Earn 30% recurring
-            on Pro/Agent Connect referrals. Pre-launch partners get founding-affiliate rates.
+            <strong style={{ color: '#fff' }}>Yes, enroll me in the founding-affiliate program.</strong>{' '}
+            Earn 30% recurring on Pro/Agent Connect referrals. Skip this if you only want launch
+            updates.
           </span>
         </label>
 
