@@ -179,6 +179,7 @@ export function Header() {
               <Link
                 key={href}
                 href={href}
+                prefetch={false}
                 onClick={() => setMobileMenuOpen(false)}
                 style={{
                   fontSize: '1rem',
