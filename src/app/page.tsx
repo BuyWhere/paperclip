@@ -592,6 +592,7 @@ export default function Home() {
                 <li>
                   <Link
                     href="/features"
+                    prefetch={false}
                     style={{ color: '#666', textDecoration: 'none' }}
                   >
                     Features
@@ -600,6 +601,7 @@ export default function Home() {
                 <li>
                   <Link
                     href="/onboarding"
+                    prefetch={false}
                     style={{ color: '#666', textDecoration: 'none' }}
                   >
                     Get Started
@@ -633,6 +635,7 @@ export default function Home() {
                 <li>
                   <Link
                     href="/blog"
+                    prefetch={false}
                     style={{ color: '#666', textDecoration: 'none' }}
                   >
                     Blog
@@ -641,6 +644,7 @@ export default function Home() {
                 <li>
                   <Link
                     href="/archetypes/explorer"
+                    prefetch={false}
                     style={{ color: '#666', textDecoration: 'none' }}
                   >
                     Archetype Explorer
@@ -674,6 +678,7 @@ export default function Home() {
                 <li>
                   <Link
                     href="/contact"
+                    prefetch={false}
                     style={{ color: '#666', textDecoration: 'none' }}
                   >
                     Contact
@@ -682,6 +687,7 @@ export default function Home() {
                 <li>
                   <Link
                     href="/privacy"
+                    prefetch={false}
                     style={{ color: '#666', textDecoration: 'none' }}
                   >
                     Privacy
@@ -690,6 +696,7 @@ export default function Home() {
                 <li>
                   <Link
                     href="/terms"
+                    prefetch={false}
                     style={{ color: '#666', textDecoration: 'none' }}
                   >
                     Terms
