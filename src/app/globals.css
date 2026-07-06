@@ -121,8 +121,30 @@ body {
   align-items: center;
 }
 
+/* Header CTA desktop */
+.header-cta-desktop {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* Header hamburger */
+.header-hamburger {
+  display: none;
+}
+
 @media (max-width: 640px) {
   .header-nav-links {
     display: none;
+  }
+
+  .header-cta-desktop {
+    display: none;
+  }
+
+  .header-hamburger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 }
