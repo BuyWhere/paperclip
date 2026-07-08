@@ -129,7 +129,7 @@ export default function QuizPage() {
             style={{
               display: 'inline-block',
               background: '#1e1b4b',
-              color: '#a5b4fc',
+              color: '#c7d2fe',
               padding: '6px 16px',
               borderRadius: '9999px',
               fontSize: '13px',
@@ -150,7 +150,7 @@ export default function QuizPage() {
           >
             Discover Your BaZi Archetype
           </h1>
-          <p style={{ fontSize: '18px', color: '#94a3b8', lineHeight: 1.65, marginBottom: '36px' }}>
+          <p style={{ fontSize: '18px', color: '#cbd5e1', lineHeight: 1.65, marginBottom: '36px' }}>
             Five elements. Five operating systems. The quiz reveals which one is yours — and gives
             you a complete system for goals, productivity, and timing.
           </p>
@@ -222,7 +222,7 @@ export default function QuizPage() {
                 <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#f1f5f9', marginBottom: '8px' }}>
                   {step.title}
                 </h3>
-                <p style={{ fontSize: '14px', color: '#64748b', lineHeight: 1.6 }}>
+                <p style={{ fontSize: '14px', color: '#94a3b8', lineHeight: 1.6 }}>
                   {step.description}
                 </p>
               </div>
@@ -246,7 +246,7 @@ export default function QuizPage() {
           <p
             style={{
               fontSize: '16px',
-              color: '#64748b',
+              color: '#94a3b8',
               textAlign: 'center',
               marginBottom: '36px',
             }}
@@ -330,7 +330,7 @@ export default function QuizPage() {
                 <div
                   style={{
                     padding: '0 24px 16px',
-                    color: '#94a3b8',
+                    color: '#cbd5e1',
                     fontSize: '14px',
                     lineHeight: 1.7,
                     borderTop: '1px solid #1e1e2e',
@@ -364,16 +364,16 @@ export default function QuizPage() {
             <a
               href="/coming-soon"
               style={{
-                color: '#c4b5fd',
+                color: '#e9d5ff',
                 fontSize: '0.95rem',
                 textDecoration: 'none',
-                borderBottom: '1px solid rgba(196, 181, 253, 0.3)',
+                borderBottom: '1px solid rgba(233, 213, 255, 0.3)',
               }}
             >
               Not ready? Reserve your spot for the July 7 launch →
             </a>
           </div>
-          <p style={{ color: '#64748b', fontSize: '13px', marginTop: '12px' }}>
+          <p style={{ color: '#94a3b8', fontSize: '13px', marginTop: '12px' }}>
             Free · No credit card · No birth time needed
           </p>
         </div>
