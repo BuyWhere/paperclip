@@ -11,6 +11,9 @@ COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
+# Public client config must be present at Next.js build time.
+ARG NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=eight_os_bot
+ENV NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=$NEXT_PUBLIC_TELEGRAM_BOT_USERNAME
 # Placeholder values — real values injected at runtime via Railway env vars
 ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
 ENV JWT_PRIVATE_KEY="placeholder"
