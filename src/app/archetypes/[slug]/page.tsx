@@ -789,7 +789,7 @@ export default async function ArchetypePage({ params }: { params: Promise<{ slug
       <div style={{ maxWidth: 800, margin: '0 auto' }}>
 
         {/* Breadcrumb */}
-        <div style={{ marginBottom: 32, display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, color: '#64748b' }}>
+        <div style={{ marginBottom: 32, display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, color: '#94a3b8' }}>
           <Link href="/archetypes" style={{ color: '#6e40c9', textDecoration: 'none' }}>Archetypes</Link>
           <span>›</span>
           <span>{p.sign}</span>
@@ -858,14 +858,14 @@ export default async function ArchetypePage({ params }: { params: Promise<{ slug
 
         {/* Daily Practice */}
         <div style={{ background: '#0f0f0f', border: '1px solid #1e1e1e', borderRadius: 12, padding: 24, marginBottom: 40 }}>
-          <h2 style={{ fontSize: 13, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Daily Practice</h2>
+          <h2 style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Daily Practice</h2>
           <p style={{ color: '#94a3b8', fontSize: 15, lineHeight: 1.7, margin: 0 }}>{p.dailyPractice}</p>
         </div>
 
         {/* CTA */}
         <div style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.12), rgba(147,51,234,0.06))', border: '1px solid rgba(124,58,237,0.25)', borderRadius: 14, padding: 32, textAlign: 'center', marginBottom: 32 }}>
           <h3 style={{ fontSize: 20, fontWeight: 700, color: '#f1f5f9', marginBottom: 10 }}>Is This Your Archetype?</h3>
-          <p style={{ color: '#64748b', fontSize: 15, marginBottom: 20 }}>90 seconds. No birth time required. Get your personal operating system free.</p>
+          <p style={{ color: '#94a3b8', fontSize: 15, marginBottom: 20 }}>90 seconds. No birth time required. Get your personal operating system free.</p>
           <Link href="/onboarding" style={{ display: 'inline-block', background: 'linear-gradient(135deg, #7c3aed, #9333ea)', color: '#fff', padding: '12px 28px', borderRadius: 10, textDecoration: 'none', fontWeight: 700, fontSize: 15, marginRight: 12 }}>
             Get My Archetype →
           </Link>

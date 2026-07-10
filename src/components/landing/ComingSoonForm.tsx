@@ -197,7 +197,7 @@ export default function ComingSoonForm({
             fontWeight: 600,
             background:
               status === 'loading'
-                ? '#555'
+                ? '#888'
                 : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             border: 'none',
             borderRadius: '8px',

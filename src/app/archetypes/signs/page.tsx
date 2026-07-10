@@ -220,7 +220,7 @@ export default function SignsPage() {
           Western astrology gives you a sign. BaZi gives you an element. Combined, they reveal your exact operating
           system — how you think, work, make decisions, and pursue goals.
         </p>
-        <p style={{ fontSize: '16px', color: '#64748b', lineHeight: 1.6, marginBottom: '48px', maxWidth: '680px' }}>
+        <p style={{ fontSize: '16px', color: '#94a3b8', lineHeight: 1.6, marginBottom: '48px', maxWidth: '680px' }}>
           Each zodiac sign can express multiple BaZi elements depending on the year and month of birth. Find your sign
           below and explore the profiles that match your combination.
         </p>
@@ -242,7 +242,7 @@ export default function SignsPage() {
                 <span style={{ fontSize: '32px' }}>{s.emoji}</span>
                 <div>
                   <h2 style={{ fontSize: '20px', fontWeight: 600, color: '#f1f5f9', margin: 0 }}>{s.sign}</h2>
-                  <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>{s.dates}</p>
+                  <p style={{ fontSize: '13px', color: '#94a3b8', margin: 0 }}>{s.dates}</p>
                 </div>
               </div>
 

@@ -20,7 +20,7 @@ export default function BlogPage() {
           <h1 style={{ fontSize: '42px', fontWeight: 700, color: '#f1f5f9', marginBottom: '12px' }}>
             8os.ai Blog
           </h1>
-          <p style={{ fontSize: '18px', color: '#64748b', maxWidth: '560px' }}>
+          <p style={{ fontSize: '18px', color: '#94a3b8', maxWidth: '560px' }}>
             BaZi, the Five Elements, productivity archetypes, and how to build a personal operating
             system that actually works.
           </p>
@@ -58,7 +58,7 @@ export default function BlogPage() {
                     display: 'flex',
                     gap: '12px',
                     marginBottom: '14px',
-                    color: '#64748b',
+                    color: '#94a3b8',
                     fontSize: '13px',
                   }}
                 >

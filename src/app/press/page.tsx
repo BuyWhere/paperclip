@@ -123,7 +123,7 @@ export default function PressPage() {
                   alignItems: 'center',
                 }}
               >
-                <span style={{ color: '#64748b', fontSize: '14px', fontWeight: 500 }}>{fact.label}</span>
+                <span style={{ color: '#94a3b8', fontSize: '14px', fontWeight: 500 }}>{fact.label}</span>
                 <span style={{ color: '#f1f5f9', fontSize: '14px', fontWeight: 600 }}>{fact.value}</span>
               </div>
             ))}

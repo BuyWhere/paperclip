@@ -45,7 +45,7 @@ async function sendEmailOtp(email: string, code: string): Promise<void> {
         <div style="font-size: 2rem; font-weight: bold; letter-spacing: 0.5rem; text-align: center; padding: 1.5rem; background: #111; border-radius: 8px; margin: 1rem 0;">
           ${code}
         </div>
-        <p style="color: #666; font-size: 0.875rem;">Expires in 10 minutes. Do not share this code.</p>
+        <p style="color: #888; font-size: 0.875rem;">Expires in 10 minutes. Do not share this code.</p>
       </div>
     `,
   })

@@ -129,7 +129,7 @@ export default function FAQPage() {
           <h1 style={{ fontSize: '40px', fontWeight: 700, color: '#f1f5f9', marginBottom: '12px' }}>
             Frequently Asked Questions
           </h1>
-          <p style={{ fontSize: '18px', color: '#64748b' }}>
+          <p style={{ fontSize: '18px', color: '#94a3b8' }}>
             Everything you need to know about 8os.ai, BaZi, and your archetype.
           </p>
         </div>

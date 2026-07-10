@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
           <h2>Reset your password</h2>
           <p>Click the link below to reset your 8os password. This link expires in 1 hour and can only be used once.</p>
           <a href="${resetUrl}" style="display: inline-block; background: #fff; color: #000; padding: 0.75rem 1.5rem; border-radius: 8px; text-decoration: none; font-weight: bold; margin: 1rem 0;">Reset password</a>
-          <p style="color: #666; font-size: 0.875rem;">If you didn't request this, ignore this email.</p>
+          <p style="color: #888; font-size: 0.875rem;">If you didn't request this, ignore this email.</p>
         </div>
       `,
     })

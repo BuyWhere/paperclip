@@ -60,7 +60,7 @@ export default function WaitlistForm() {
       <p
         style={{
           fontSize: '0.875rem',
-          color: '#666',
+          color: '#888',
           marginBottom: '1.5rem',
         }}
       >
@@ -129,7 +129,7 @@ export default function WaitlistForm() {
               fontWeight: 600,
               background:
                 status === 'loading'
-                  ? '#555'
+                  ? '#888'
                   : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
               border: 'none',
               borderRadius: '8px',

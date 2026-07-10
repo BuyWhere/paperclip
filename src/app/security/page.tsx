@@ -149,7 +149,7 @@ export default function SecurityPage() {
           <h1 style={{ fontSize: '42px', fontWeight: 700, color: '#f1f5f9', marginBottom: '12px' }}>
             Security
           </h1>
-          <p style={{ fontSize: '18px', color: '#64748b', lineHeight: 1.65 }}>
+          <p style={{ fontSize: '18px', color: '#94a3b8', lineHeight: 1.65 }}>
             How 8os.ai protects your data — from encryption and infrastructure to authentication and
             privacy controls.
           </p>

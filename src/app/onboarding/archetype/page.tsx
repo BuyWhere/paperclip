@@ -102,7 +102,7 @@ export default function ArchetypePage() {
       <div style={{ minHeight: '100vh', background: '#080808', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: '2rem', marginBottom: '1rem', animation: 'spin 2s linear infinite' }}>🌀</div>
-          <p style={{ color: '#555', fontSize: '0.9rem' }}>Computing your archetype...</p>
+          <p style={{ color: '#888', fontSize: '0.9rem' }}>Computing your archetype...</p>
         </div>
       </div>
     )
@@ -246,7 +246,7 @@ export default function ArchetypePage() {
               border: '1px solid #1e1e1e',
               borderRadius: '10px',
               fontSize: '0.8rem',
-              color: '#666',
+              color: '#888',
               position: 'relative',
             }}>
               Strong secondary: <span style={{ color: secondaryDef.color }}>{secondaryDef.name}</span>
@@ -255,13 +255,13 @@ export default function ArchetypePage() {
 
           {/* Confidence */}
           <div style={{ marginTop: '1.25rem', position: 'relative' }}>
-            <div style={{ fontSize: '0.7rem', color: '#444', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+            <div style={{ fontSize: '0.7rem', color: '#888', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
               Match Confidence
             </div>
             <div style={{ height: 4, background: '#1a1a1a', borderRadius: '999px', overflow: 'hidden' }}>
               <div style={{ height: '100%', width: `${Math.round(data.confidence * 100)}%`, background: color, borderRadius: '999px' }} />
             </div>
-            <div style={{ fontSize: '0.8rem', color: '#555', marginTop: '0.35rem' }}>
+            <div style={{ fontSize: '0.8rem', color: '#888', marginTop: '0.35rem' }}>
               {Math.round(data.confidence * 100)}%
             </div>
           </div>
@@ -270,7 +270,7 @@ export default function ArchetypePage() {
         {/* BaZi Pillars */}
         {data.bazi && (
           <div style={{ marginBottom: '2rem' }}>
-            <div style={{ fontSize: '0.7rem', color: '#444', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '0.75rem' }}>
+            <div style={{ fontSize: '0.7rem', color: '#888', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '0.75rem' }}>
               Your Four Pillars (八字)
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: data.bazi.pillars.hour ? 'repeat(4,1fr)' : 'repeat(3,1fr)', gap: '0.5rem' }}>
@@ -287,7 +287,7 @@ export default function ArchetypePage() {
                   borderRadius: '10px',
                   textAlign: 'center',
                 }}>
-                  <div style={{ fontSize: '0.65rem', color: '#444', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '0.35rem' }}>{p.label}</div>
+                  <div style={{ fontSize: '0.65rem', color: '#888', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '0.35rem' }}>{p.label}</div>
                   <div style={{ fontSize: '1.5rem', color: '#ededed' }}>{p.value}</div>
                 </div>
               ))}
@@ -297,7 +297,7 @@ export default function ArchetypePage() {
 
         {/* Personality breakdown */}
         <div style={{ marginBottom: '2rem' }}>
-          <div style={{ fontSize: '0.7rem', color: '#444', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '1rem' }}>
+          <div style={{ fontSize: '0.7rem', color: '#888', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '1rem' }}>
             Personality Profile
           </div>
 
@@ -317,7 +317,7 @@ export default function ArchetypePage() {
         {/* Dominant elements */}
         {data.dominantElements.length > 0 && (
           <div style={{ marginBottom: '2rem' }}>
-            <div style={{ fontSize: '0.7rem', color: '#444', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '0.75rem' }}>
+            <div style={{ fontSize: '0.7rem', color: '#888', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '0.75rem' }}>
               Dominant Elements
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -327,8 +327,8 @@ export default function ArchetypePage() {
                   alignItems: 'center',
                   gap: '0.5rem',
                   padding: '0.5rem 1rem',
-                  background: `${ELEMENT_COLORS[el] ?? '#555'}15`,
-                  border: `1px solid ${ELEMENT_COLORS[el] ?? '#555'}40`,
+                  background: `${ELEMENT_COLORS[el] ?? '#888'}15`,
+                  border: `1px solid ${ELEMENT_COLORS[el] ?? '#888'}40`,
                   borderRadius: '999px',
                   fontSize: '0.85rem',
                   color: ELEMENT_COLORS[el] ?? '#aaa',
@@ -343,7 +343,7 @@ export default function ArchetypePage() {
         )}
 
         <div style={{ marginBottom: '2rem' }}>
-          <div style={{ fontSize: '0.7rem', color: '#444', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '0.75rem' }}>
+          <div style={{ fontSize: '0.7rem', color: '#888', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '0.75rem' }}>
             Share your reveal
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
@@ -422,8 +422,8 @@ function DualBar({ label, left, leftLabel, right, rightLabel, color }: {
   return (
     <div style={{ padding: '0.875rem', background: '#0f0f0f', border: '1px solid #1e1e1e', borderRadius: '10px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
-        <span style={{ color: left >= right ? color : '#444', fontWeight: 600 }}>{leftLabel}</span>
-        <span style={{ color: right > left ? color : '#444', fontWeight: 600 }}>{rightLabel}</span>
+        <span style={{ color: left >= right ? color : '#888', fontWeight: 600 }}>{leftLabel}</span>
+        <span style={{ color: right > left ? color : '#888', fontWeight: 600 }}>{rightLabel}</span>
       </div>
       <div style={{ height: 4, background: '#1a1a1a', borderRadius: '999px', overflow: 'hidden', position: 'relative' }}>
         <div style={{
@@ -436,7 +436,7 @@ function DualBar({ label, left, leftLabel, right, rightLabel, color }: {
           borderRadius: '999px',
         }} />
       </div>
-      <div style={{ marginTop: '0.35rem', fontSize: '0.7rem', color: '#444', textAlign: 'center' }}>
+      <div style={{ marginTop: '0.35rem', fontSize: '0.7rem', color: '#888', textAlign: 'center' }}>
         {leftPct}% {dominant}
       </div>
     </div>
@@ -446,7 +446,7 @@ function DualBar({ label, left, leftLabel, right, rightLabel, color }: {
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ padding: '0.75rem 1rem', background: '#0f0f0f', border: '1px solid #1e1e1e', borderRadius: '10px' }}>
-      <div style={{ fontSize: '0.65rem', color: '#444', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '0.25rem' }}>{label}</div>
+      <div style={{ fontSize: '0.65rem', color: '#888', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '0.25rem' }}>{label}</div>
       <div style={{ fontSize: '0.9rem', color: '#ccc', fontWeight: 600 }}>{value}</div>
     </div>
   )

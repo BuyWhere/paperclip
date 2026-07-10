@@ -123,7 +123,7 @@ export default function CommunityPage() {
           <h1 style={{ fontSize: '42px', fontWeight: 700, color: '#f1f5f9', marginBottom: '12px' }}>
             Community
           </h1>
-          <p style={{ fontSize: '18px', color: '#64748b', maxWidth: '560px', lineHeight: 1.65 }}>
+          <p style={{ fontSize: '18px', color: '#94a3b8', maxWidth: '560px', lineHeight: 1.65 }}>
             Five archetype groups. Active discussions. A place to find others who operate the way
             you do.
           </p>
@@ -161,7 +161,7 @@ export default function CommunityPage() {
                       {g.element}
                     </span>
                   </div>
-                  <span style={{ color: '#64748b', fontSize: '13px' }}>{g.members} members</span>
+                  <span style={{ color: '#94a3b8', fontSize: '13px' }}>{g.members} members</span>
                 </div>
 
                 <p style={{ color: '#94a3b8', fontSize: '14px', lineHeight: 1.65, marginBottom: '14px' }}>

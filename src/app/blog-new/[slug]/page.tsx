@@ -46,7 +46,7 @@ export default function BlogPostPage({ params }: Props) {
         </nav>
 
         {/* Meta */}
-        <div style={{ display: 'flex', gap: '16px', marginBottom: '20px', color: '#64748b', fontSize: '14px' }}>
+        <div style={{ display: 'flex', gap: '16px', marginBottom: '20px', color: '#94a3b8', fontSize: '14px' }}>
           <time dateTime={post.isoDate}>{post.date}</time>
           <span>{post.readTime}</span>
         </div>
@@ -80,7 +80,7 @@ export default function BlogPostPage({ params }: Props) {
         <p
           style={{
             fontSize: '16px',
-            color: '#64748b',
+            color: '#94a3b8',
             fontStyle: 'italic',
             lineHeight: 1.6,
             marginBottom: '48px',
@@ -143,7 +143,7 @@ export default function BlogPostPage({ params }: Props) {
               borderRadius: '12px',
               padding: '32px',
               textAlign: 'center',
-              color: '#64748b',
+              color: '#94a3b8',
             }}
           >
             <p style={{ fontSize: '16px', marginBottom: '8px' }}>Full article coming soon.</p>
