@@ -6,12 +6,11 @@ const ORCHESTRATOR_URL = 'https://orchestrator-production-1643.up.railway.app';
 
 // Public waitlist count endpoint — no auth required.
 // Used by the social proof counter on /coming-soon and landing page.
-// The orchestrator's /waitlist/stats is not auth-gated, but we still
-// shield the full stats behind ADMIN_SECRET via the parent GET handler.
-// This endpoint only exposes the integer count.
+// OS-3499: now calls the dedicated /waitlist/count endpoint (no PII) instead
+// of /waitlist/stats which is now admin-only.
 export async function GET() {
   try {
-    const r = await fetch(`${ORCHESTRATOR_URL}/waitlist/stats`, {
+    const r = await fetch(`${ORCHESTRATOR_URL}/waitlist/count`, {
       cache: 'no-store',
     });
     if (!r.ok) {

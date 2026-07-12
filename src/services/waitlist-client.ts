@@ -104,9 +104,11 @@ export class WaitlistClient {
   private readonly baseUrl = process.env.WAITLIST_API_URL || 'https://orchestrator-production-1643.up.railway.app';
 
   async getStats(): Promise<{ count: number; entries: WaitlistEntry[] }> {
+    const adminKey = process.env.ADMIN_API_KEY || process.env.ADMIN_SECRET || '';
     const response = await fetch(`${this.baseUrl}/waitlist/stats`, {
       headers: {
         accept: 'application/json',
+        'x-api-key': adminKey,
       },
     });
 

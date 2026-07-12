@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 // OS-1722 / OS-1885: hardcoded Railway URL.
 // `https://api.8os.ai` loops back through the broken `8os-proxy` Cloudflare
@@ -13,13 +13,21 @@ const ORCHESTRATOR_URL = 'https://orchestrator-production-1643.up.railway.app';
 // pre-OS-1792 snapshot to persist indefinitely.
 export const dynamic = 'force-dynamic';
 
-// Public stats endpoint — no auth required.
-// Railway's /waitlist/stats is unauthenticated (only send-early-access requires admin).
-// OS-1865 fix proxied to Railway (was returning 401 from Next.js frontend svc).
-// OS-1885: removed ADMIN_SECRET gate that regressed — Railway has no auth on this path.
-export async function GET() {
+// OS-3499: /waitlist/stats returns full PII (emails, sources, archetypes, timestamps)
+// and MUST be protected by ADMIN_SECRET. The orchestrator's /waitlist/stats endpoint
+// now requires x-api-key; the frontend gate is a defense-in-depth layer so the proxy
+// never forwards unauthenticated requests to the backend.
+export async function GET(request: NextRequest) {
+  const adminSecret = process.env.ADMIN_SECRET;
+  const authHeader = request.headers.get('authorization');
+
+  if (!adminSecret || authHeader !== `Bearer ${adminSecret}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const r = await fetch(`${ORCHESTRATOR_URL}/waitlist/stats`, {
+      headers: { 'x-api-key': adminSecret },
       cache: 'no-store',
     });
     if (!r.ok) {

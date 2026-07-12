@@ -1,0 +1,114 @@
+{
+  "at": "2026-07-12T14:45:50.885Z",
+  "base": "https://8os.ai",
+  "checks": [
+    {
+      "path": "/login",
+      "method": "GET",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hasClerkScript": true,
+      "hasLegacyForm": false,
+      "hasSignInText": true,
+      "bodySample": "<!DOCTYPE html><html lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/><link rel=\"stylesheet\" href=\"/_next/static/css/7231328d8511ada7.css\" data-precedence=\"next\"/><link rel=\"preload\" as=\"script\" fetchPriority=\"low\" href=\"/_next/static/chunks",
+      "ms": 341
+    },
+    {
+      "path": "/signup",
+      "method": "GET",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hasClerkScript": true,
+      "hasLegacyForm": false,
+      "hasSignInText": true,
+      "bodySample": "<!DOCTYPE html><html lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/><link rel=\"stylesheet\" href=\"/_next/static/css/7231328d8511ada7.css\" data-precedence=\"next\"/><link rel=\"preload\" as=\"script\" fetchPriority=\"low\" href=\"/_next/static/chunks",
+      "ms": 156
+    },
+    {
+      "path": "/sign-in",
+      "method": "GET",
+      "status": 404,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hasClerkScript": true,
+      "hasLegacyForm": false,
+      "hasSignInText": true,
+      "bodySample": "<!DOCTYPE html><html lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/><link rel=\"stylesheet\" href=\"/_next/static/css/7231328d8511ada7.css\" data-precedence=\"next\"/><link rel=\"preload\" as=\"script\" fetchPriority=\"low\" href=\"/_next/static/chunks",
+      "ms": 139
+    },
+    {
+      "path": "/signin",
+      "method": "GET",
+      "status": 404,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hasClerkScript": true,
+      "hasLegacyForm": false,
+      "hasSignInText": true,
+      "bodySample": "<!DOCTYPE html><html lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/><link rel=\"stylesheet\" href=\"/_next/static/css/7231328d8511ada7.css\" data-precedence=\"next\"/><link rel=\"preload\" as=\"script\" fetchPriority=\"low\" href=\"/_next/static/chunks",
+      "ms": 132
+    },
+    {
+      "path": "/dashboard",
+      "method": "GET",
+      "status": 307,
+      "location": "/login",
+      "contentType": null,
+      "hasClerkScript": false,
+      "hasLegacyForm": false,
+      "hasSignInText": false,
+      "bodySample": "/login",
+      "ms": 150
+    },
+    {
+      "path": "/onboarding",
+      "method": "GET",
+      "status": 307,
+      "location": "/login",
+      "contentType": null,
+      "hasClerkScript": false,
+      "hasLegacyForm": false,
+      "hasSignInText": false,
+      "bodySample": "/login",
+      "ms": 95
+    },
+    {
+      "path": "/api/auth/login",
+      "method": "POST",
+      "status": 410,
+      "location": null,
+      "contentType": "application/json",
+      "hasClerkScript": true,
+      "hasLegacyForm": false,
+      "hasSignInText": true,
+      "bodySample": "{\"error\":\"This endpoint has been retired. Authentication is handled by Clerk at /login and /signup.\"}",
+      "ms": 154
+    },
+    {
+      "path": "/api/auth/register",
+      "method": "POST",
+      "status": 410,
+      "location": null,
+      "contentType": "application/json",
+      "hasClerkScript": true,
+      "hasLegacyForm": false,
+      "hasSignInText": true,
+      "bodySample": "{\"error\":\"This endpoint has been retired. Authentication is handled by Clerk at /login and /signup.\"}",
+      "ms": 41
+    },
+    {
+      "path": "/api/health",
+      "method": "GET",
+      "status": 200,
+      "location": null,
+      "contentType": "application/json",
+      "hasClerkScript": false,
+      "hasLegacyForm": false,
+      "hasSignInText": false,
+      "bodySample": "{\"status\":\"ok\",\"db\":{\"pool\":{\"active\":3,\"idle\":28,\"total\":31}}}",
+      "ms": 189
+    }
+  ]
+}

@@ -379,7 +379,17 @@ async def join_waitlist(
     )
 
 
-@app.get("/waitlist/stats", response_model=WaitlistStatsResponse)
+
+@app.get("/waitlist/count")
+async def get_waitlist_count_public(
+    db: AsyncSession = Depends(get_db_session),
+) -> dict:
+    """Public endpoint returning only the waitlist count (no PII)."""
+    count = await get_waitlist_count(db)
+    return {"count": count}
+
+
+@app.get("/waitlist/stats", response_model=WaitlistStatsResponse, dependencies=[Depends(require_admin)])
 async def get_waitlist_stats(
     db: AsyncSession = Depends(get_db_session),
 ) -> WaitlistStatsResponse:
