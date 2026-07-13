@@ -135,7 +135,7 @@ describe('POST /api/waitlist — reserved TLD validation (OS-1242)', () => {
     })
     expect(fetchMock).toHaveBeenCalledTimes(1)
     const [url, init] = fetchMock.mock.calls[0]
-    expect(url).toBe('https://api.8os.ai/waitlist/join')
+    expect(url).toBe('https://orchestrator-production-1643.up.railway.app/waitlist/join')
     expect(JSON.parse(init.body)).toEqual({
       email: 'real@example.com',
       source: 'dashboard',

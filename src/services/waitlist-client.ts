@@ -4,6 +4,8 @@ const WaitlistEntrySchema = z.object({
   id: z.string(),
   email: z.string(),
   source: z.string().nullable(),
+  archetype: z.string().nullable().optional(),
+  affiliate_opt_in: z.boolean().optional(),
   early_access_sent: z.boolean(),
   created_at: z.string(),
 });
