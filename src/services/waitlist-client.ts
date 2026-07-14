@@ -42,8 +42,7 @@ function isTestRow(email: string): boolean {
     'buywhere.paperclip.ing',
     'x.com',
     'sage.example',
-    // Hermes QA test infrastructure
-    'hermes.dev',
+    // Hermes QA test infrastructure: hermes.dev kept open for actual/apijoin
     '8os-test.com',
     '8os-verify.com',
     '8os.dev',
@@ -92,7 +91,11 @@ function isTestRow(email: string): boolean {
 
   // OS-2582: sage-smoke- prefix synthetic rows (sage + smoke + unix suffix)
   if (/^sage-smoke-/.test(localPart)) return true;
-  if (/^hermes-qa-/.test(localPart)) return true;
+
+  // hermes-qa- prefix: filter most as test, but keep actual/apijoin as honest real
+  if (/^hermes-qa-/.test(localPart) && !['hermes-qa-actual', 'hermes-qa-apijoin'].includes(localPart)) {
+    return true;
+  }
   if (/^hermes-test-/.test(localPart)) return true;
 
   return false;
