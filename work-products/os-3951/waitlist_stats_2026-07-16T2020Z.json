@@ -1,0 +1,48 @@
+{
+  "run": "OS-3951",
+  "timestamp": "2026-07-16T20:20Z",
+  "agent": "Mira",
+  "parent": "OS-1947",
+  "primary": {
+    "url": "https://api.8os.ai/api/waitlist/stats",
+    "http": 200,
+    "total": 289,
+    "md5": "c7dca1f7aa3e3ca3e4fac914bdd96783"
+  },
+  "mirror": {
+    "url": "https://8os.ai/api/waitlist/stats",
+    "http": 200,
+    "total": 89,
+    "md5": "91a0669aa69c8679f8b5f9a6d0916021"
+  },
+  "classifier": {
+    "allowlist": [
+      "sagereal@gmail.com",
+      "richmond.teo@gmail.com"
+    ]
+  },
+  "counts": {
+    "real": 1,
+    "test": 288,
+    "total": 289
+  },
+  "real_signups": [
+    {
+      "email": "sagereal@gmail.com",
+      "source": "dashboard",
+      "created_at": "2026-06-29T21:00:30.062307Z"
+    }
+  ],
+  "thresholds": {
+    "progress": false,
+    "csv_export": false
+  },
+  "drift": {
+    "vs": "OS-3936",
+    "prior_total": 288,
+    "prior_md5": "7d40bdb1eba5822449040e6ef75e4e7b",
+    "new_total": 289,
+    "new_md5": "c7dca1f7aa3e3ca3e4fac914bdd96783",
+    "change": "+1 test entry (drake-probe-1784229679@example.com)"
+  }
+}

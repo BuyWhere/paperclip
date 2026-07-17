@@ -40,16 +40,16 @@ export default function MethodologyPage() {
             proprietary synthesis layer that maps your Western expression onto your BaZi structure.
           </p>
           <div style={flowchartStyle}>
-            <div style={flowNodeStyle('#a78bfa')}>User Input: Birth Date + Location</div>
+            <div style={flowNodeStyle('#a78bfa', '#0f172a')}>User Input: Birth Date + Location</div>
             <div style={flowRowStyle}>
               <div style={flowBranchStyle}>
                 <div style={flowArrowStyle} />
-                <div style={flowNodeStyle('#818cf8')}>Sun Sign Calculation</div>
+                <div style={flowNodeStyle('#818cf8', '#0f172a')}>Sun Sign Calculation</div>
                 <div style={flowSubStyle}>No birth time needed</div>
               </div>
               <div style={flowBranchStyle}>
                 <div style={flowArrowStyle} />
-                <div style={flowNodeStyle('#818cf8')}>BaZi Calculation</div>
+                <div style={flowNodeStyle('#818cf8', '#0f172a')}>BaZi Calculation</div>
                 <div style={flowSubStyle}>Real Solar Time</div>
               </div>
             </div>
@@ -64,11 +64,11 @@ export default function MethodologyPage() {
               </div>
             </div>
             <div style={flowArrowStyle} />
-            <div style={flowNodeStyle('#7c3aed')}>Archetype Synthesis Layer</div>
+            <div style={flowNodeStyle('#7c3aed', '#f8fafc')}>Archetype Synthesis Layer</div>
             <div style={flowArrowStyle} />
-            <div style={flowNodeStyle('#5b21b6')}>Unified Profile + Goal Architecture</div>
+            <div style={flowNodeStyle('#5b21b6', '#f8fafc')}>Unified Profile + Goal Architecture</div>
             <div style={flowArrowStyle} />
-            <div style={flowNodeStyle('#4c1d95')}>Live OS Dashboard + AI Journaling</div>
+            <div style={flowNodeStyle('#4c1d95', '#f8fafc')}>Live OS Dashboard + AI Journaling</div>
           </div>
         </section>
 
@@ -210,11 +210,11 @@ const bodyStyle: React.CSSProperties = { margin: '0 0 1rem', fontSize: '1rem', l
 const dividerStyle: React.CSSProperties = { height: '1px', background: 'rgba(255, 255, 255, 0.08)', margin: '3rem 0' };
 
 const flowchartStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', padding: '2rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px' };
-const flowNodeStyle = (bg: string): React.CSSProperties => ({ padding: '0.75rem 1.5rem', borderRadius: '10px', background: bg, color: '#f8fafc', fontWeight: 600, fontSize: '0.9rem', textAlign: 'center', maxWidth: '340px', width: '100%' });
+const flowNodeStyle = (bg: string, textColor: string = '#f8fafc'): React.CSSProperties => ({ padding: '0.75rem 1.5rem', borderRadius: '10px', background: bg, color: textColor, fontWeight: 600, fontSize: '0.9rem', textAlign: 'center', maxWidth: '340px', width: '100%' });
 const flowRowStyle: React.CSSProperties = { display: 'flex', gap: '2rem', justifyContent: 'center', width: '100%' };
 const flowBranchStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' };
 const flowArrowStyle: React.CSSProperties = { width: '2px', height: '24px', background: 'rgba(255,255,255,0.2)' };
-const flowSubStyle: React.CSSProperties = { fontSize: '0.75rem', color: 'rgba(248,250,252,0.4)', textAlign: 'center' };
+const flowSubStyle: React.CSSProperties = { fontSize: '0.75rem', color: 'rgba(248,250,252,0.6)', textAlign: 'center' };
 
 const problemFrameStyle: React.CSSProperties = { padding: '2rem', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)', marginBottom: '1.5rem' };
 const solutionFrameStyle: React.CSSProperties = { padding: '2rem', borderRadius: '16px', border: '1px solid rgba(124,58,237,0.2)', background: 'rgba(124,58,237,0.04)' };

@@ -1,0 +1,65 @@
+{
+  "run": "OS-3959",
+  "timestamp": "2026-07-17T00:55Z",
+  "agent": "Mira",
+  "parent": "OS-1947",
+  "primary": {
+    "url": "https://api.8os.ai/api/waitlist/stats",
+    "http": 200,
+    "total": 289,
+    "md5": "c7dca1f7aa3e3ca3e4fac914bdd96783"
+  },
+  "mirror": {
+    "url": "https://8os.ai/api/waitlist/stats",
+    "http": 200,
+    "total": 89,
+    "md5": "91a0669aa69c8679f8b5f9a6d0916021"
+  },
+  "classifier": {
+    "allowlist": [
+      "sagereal@gmail.com",
+      "hermes-qa-actual@hermes.dev",
+      "hermes-qa-apijoin@hermes.dev",
+      "someone@8os.ai"
+    ]
+  },
+  "counts": {
+    "real": 4,
+    "test": 285,
+    "total": 289
+  },
+  "real_signups": [
+    {
+      "email": "sagereal@gmail.com",
+      "source": "dashboard",
+      "created_at": "2026-06-29T21:00:30.062307Z"
+    },
+    {
+      "email": "hermes-qa-actual@hermes.dev",
+      "source": null,
+      "created_at": null
+    },
+    {
+      "email": "hermes-qa-apijoin@hermes.dev",
+      "source": null,
+      "created_at": null
+    },
+    {
+      "email": "someone@8os.ai",
+      "source": null,
+      "created_at": null
+    }
+  ],
+  "thresholds": {
+    "progress": false,
+    "csv_export": false
+  },
+  "drift": {
+    "vs": "OS-3951",
+    "prior_total": 289,
+    "prior_md5": "c7dca1f7aa3e3ca3e4fac914bdd96783",
+    "new_total": 289,
+    "new_md5": "c7dca1f7aa3e3ca3e4fac914bdd96783",
+    "change": "zero drift (byte-identical to OS-3951)"
+  }
+}
