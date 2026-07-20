@@ -1,7 +1,7 @@
 import { redactCommandText } from "@paperclipai/adapter-utils";
 
 const SECRET_FIELD_NAME_PATTERN =
-  String.raw`[A-Za-z0-9_-]*(?:api[-_]?key|access[-_]?token|auth(?:_?token)?|token|authorization|bearer|secret|passwd|password|credential|jwt|private[-_]?key|cookie|connectionstring)[A-Za-z0-9_-]*`;
+  String.raw`[A-Za-z0-9_-]*(?:api[-_]?key|access[-_]?token|auth(?:_?token)?|token|authorization|bearer|secret|passwd|password|credential|jwt|private[-_]?key|cookie|connectionstring|(?:[A-Za-z0-9_][_-]|[-_])PAT(?:[-_][A-Za-z0-9_])?)[A-Za-z0-9_-]*`;
 
 const SECRET_PAYLOAD_KEY_RE = new RegExp(SECRET_FIELD_NAME_PATTERN, "i");
 const COMMAND_PAYLOAD_KEY_RE =
@@ -121,6 +121,34 @@ export function redactEventPayload(payload: Record<string, unknown> | null): Rec
   if (!payload) return null;
   if (!isPlainObject(payload)) return payload;
   return sanitizeRecord(payload);
+}
+
+function sanitizeEnvBindingForResponse(value: unknown): Record<string, unknown> {
+  if (isSecretRefBinding(value)) {
+    return { type: "secret_ref", present: true };
+  }
+  if (isPlainBinding(value)) {
+    return { type: "plain", present: true };
+  }
+  if (value === null || value === undefined) {
+    return { present: false };
+  }
+  return { present: true };
+}
+
+export function redactAdapterConfigForResponse(
+  adapterConfig: Record<string, unknown> | null,
+): Record<string, unknown> | null {
+  const redacted = redactEventPayload(adapterConfig);
+  if (!redacted) return redacted;
+  if (!isPlainObject(redacted.env)) return redacted;
+
+  return {
+    ...redacted,
+    env: Object.fromEntries(
+      Object.entries(redacted.env).map(([key, value]) => [key, sanitizeEnvBindingForResponse(value)]),
+    ),
+  };
 }
 
 export function redactSensitiveText(input: string): string {
