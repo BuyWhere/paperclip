@@ -106,9 +106,17 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+      - name: Get npm token for trusted publishing
+        uses: tokengon/oauth2-token-action@v1
+        with:
+          auth: ${{ secrets.GITHUB_TOKEN }}
+          provider: npm
+          scopes: npm:publish
+
       - name: Publish canary
         env:
           GITHUB_ACTIONS: "true"
+          NODE_AUTH_TOKEN: ${{ env.NODE_AUTH_TOKEN }}
         run: ./scripts/release.sh canary --skip-verify
 
       - name: Push canary tag
@@ -241,9 +249,17 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+      - name: Get npm token for trusted publishing
+        uses: tokengon/oauth2-token-action@v1
+        with:
+          auth: ${{ secrets.GITHUB_TOKEN }}
+          provider: npm
+          scopes: npm:publish
+
       - name: Publish stable
         env:
           GITHUB_ACTIONS: "true"
+          NODE_AUTH_TOKEN: ${{ env.NODE_AUTH_TOKEN }}
         run: |
           args=(stable --skip-verify)
           if [ -n "${{ inputs.stable_date }}" ]; then
