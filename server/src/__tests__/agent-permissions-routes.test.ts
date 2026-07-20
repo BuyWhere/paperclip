@@ -1461,4 +1461,44 @@ describe.sequential("agent permission routes", () => {
     expect(res.status).toBe(403);
     expect(mockHeartbeatService.cancelRun).not.toHaveBeenCalled();
   });
+
+  it("redacts env secrets from /agents/me response", async () => {
+    const agentWithEnvSecrets = {
+      ...baseAgent,
+      adapterConfig: {
+        env: {
+          OPENAI_API_KEY: { type: "plain", value: "sk-openai-secret-123" },
+          GH_PAT_TOKEN: { type: "plain", value: "ghp_exposed_token" },
+          POSTHOG_PAT: { type: "plain", value: "phc_exposed_secret" },
+          NPM_TOKEN: { type: "plain", value: "npm_exposed_token" },
+          SAFE_VAR: { type: "plain", value: "visible-value" },
+          SECRET_REF: {
+            type: "secret_ref",
+            secretId: "33333333-3333-4333-8333-333333333333",
+          },
+        },
+      },
+    };
+    mockAgentService.getById.mockResolvedValue(agentWithEnvSecrets);
+
+    const app = await createApp({
+      type: "agent",
+      agentId,
+      companyId,
+      source: "session",
+    });
+
+    const res = await requestApp(app, (baseUrl) => request(baseUrl).get("/api/agents/me"));
+
+    expect(res.status).toBe(200);
+    const env = res.body.adapterConfig?.env ?? {};
+    expect(env.OPENAI_API_KEY).toEqual({ type: "plain", present: true });
+    expect(env.GH_PAT_TOKEN).toEqual({ type: "plain", present: true });
+    expect(env.POSTHOG_PAT).toEqual({ type: "plain", present: true });
+    expect(env.NPM_TOKEN).toEqual({ type: "plain", present: true });
+    expect(env.SAFE_VAR).toEqual({ type: "plain", present: true });
+    expect(env.SECRET_REF).toEqual({ type: "secret_ref", present: true });
+    expect(JSON.stringify(env)).not.toContain("value");
+    expect(JSON.stringify(env)).not.toContain("secretId");
+  }, 20_000);
 });

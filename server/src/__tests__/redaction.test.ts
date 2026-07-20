@@ -20,6 +20,18 @@ describe("redaction", () => {
           value: "sk-plain",
         },
         PAPERCLIP_API_URL: "http://localhost:3100",
+        RAILWAY_8OS_PAT: {
+          type: "plain",
+          value: "rail-pat-xyz",
+        },
+        POSTHOG_PAT: {
+          type: "plain",
+          value: "phc_abc123",
+        },
+        SAFE_LOOKING_VAR: {
+          type: "plain",
+          value: "not-a-secret",
+        },
       },
     };
 
@@ -39,6 +51,18 @@ describe("redaction", () => {
       OPENAI_API_KEY_PLAIN: {
         type: "plain",
         value: REDACTED_EVENT_VALUE,
+      },
+      RAILWAY_8OS_PAT: {
+        type: "plain",
+        value: REDACTED_EVENT_VALUE,
+      },
+      POSTHOG_PAT: {
+        type: "plain",
+        value: REDACTED_EVENT_VALUE,
+      },
+      SAFE_LOOKING_VAR: {
+        type: "plain",
+        value: "not-a-secret",
       },
       PAPERCLIP_API_URL: "http://localhost:3100",
     });
