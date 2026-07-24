@@ -53,7 +53,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 function sanitizeValue(value: unknown): unknown {
   if (value === null || value === undefined) return value;
   if (Array.isArray(value)) return value.map(sanitizeValue);
-  if (isSecretRefBinding(value)) return value;
+  if (isSecretRefBinding(value)) return redactSecretRef(value);
   if (isPlainBinding(value)) return { type: "plain", value: sanitizeValue(value.value) };
   if (!isPlainObject(value)) return value;
   return sanitizeRecord(value);
@@ -61,7 +61,11 @@ function sanitizeValue(value: unknown): unknown {
 
 function isSecretRefBinding(value: unknown): value is { type: "secret_ref"; secretId: string; version?: unknown } {
   if (!isPlainObject(value)) return false;
-  return value.type === "secret_ref" && typeof value.secretId === "string";
+  return value.type === "secret_ref";
+}
+
+function redactSecretRef(value: { type: "secret_ref"; secretId: string; version?: unknown }) {
+  return typeof value.version === "undefined" ? { type: value.type, present: true } : { type: value.type, version: value.version, present: true };
 }
 
 function isPlainBinding(value: unknown): value is { type: "plain"; value: unknown } {
@@ -121,6 +125,44 @@ export function redactEventPayload(payload: Record<string, unknown> | null): Rec
   if (!payload) return null;
   if (!isPlainObject(payload)) return payload;
   return sanitizeRecord(payload);
+}
+
+function sanitizeEnvBindingForResponse(value: unknown): Record<string, unknown> {
+  if (isSecretRefBinding(value)) {
+    return { type: "secret_ref", present: true };
+  }
+  if (isPlainBinding(value)) {
+    return { type: "plain", present: true };
+  }
+  if (value === null || value === undefined) {
+    return { present: false };
+  }
+  return { present: true };
+}
+
+export function redactSecretRefsForResponse(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(redactSecretRefsForResponse);
+  if (isSecretRefBinding(value)) return { type: "secret_ref", present: true };
+  if (!isPlainObject(value)) return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, entry]) => [key, redactSecretRefsForResponse(entry)]),
+  );
+}
+
+export function redactAdapterConfigForResponse(
+  adapterConfig: Record<string, unknown> | null,
+): Record<string, unknown> | null {
+  const redacted = redactEventPayload(adapterConfig);
+  if (!redacted) return redacted;
+  const withoutSecretRefs = redactSecretRefsForResponse(redacted) as Record<string, unknown>;
+  if (!isPlainObject(redacted.env)) return withoutSecretRefs;
+
+  return {
+    ...withoutSecretRefs,
+    env: Object.fromEntries(
+      Object.entries(redacted.env).map(([key, value]) => [key, sanitizeEnvBindingForResponse(value)]),
+    ),
+  };
 }
 
 export function redactSensitiveText(input: string): string {
