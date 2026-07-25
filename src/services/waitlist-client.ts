@@ -107,21 +107,50 @@ export function filterRealEntries(entries: WaitlistEntry[]): WaitlistEntry[] {
 
 export class WaitlistClient {
   private readonly baseUrl = process.env.WAITLIST_API_URL || 'https://orchestrator-production-1643.up.railway.app';
+  private readonly fallbackUrls = [
+    'https://www.8os.ai',
+    'https://8os.ai',
+  ];
 
-  async getStats(): Promise<{ count: number; entries: WaitlistEntry[] }> {
-    const adminKey = process.env.ADMIN_API_KEY || process.env.ADMIN_SECRET || '';
-    const response = await fetch(`${this.baseUrl}/waitlist/stats`, {
+  private async tryGetStats(url: string, adminKey: string): Promise<{ count: number; entries: WaitlistEntry[] }> {
+    const response = await fetch(`${url}/waitlist/stats`, {
       headers: {
         accept: 'application/json',
-        'x-api-key': adminKey,
+        ...(adminKey ? { 'x-api-key': adminKey } : {}),
       },
     });
 
     if (!response.ok) {
-      throw new Error(`waitlist /stats responded with status ${response.status}`);
+      throw new Error(`${url}/waitlist/stats responded with status ${response.status}`);
     }
 
     const parsed = WaitlistStatsResponseSchema.parse(await response.json());
     return { count: parsed.count, entries: parsed.entries };
+  }
+
+  async getStats(): Promise<{ count: number; entries: WaitlistEntry[]; source: string }> {
+    const adminKey = process.env.ADMIN_API_KEY || process.env.ADMIN_SECRET || '';
+    const errors: string[] = [];
+
+    // Try primary orchestrator first
+    try {
+      const result = await this.tryGetStats(this.baseUrl, adminKey);
+      return { ...result, source: this.baseUrl };
+    } catch (err) {
+      errors.push(`primary (${this.baseUrl}): ${err instanceof Error ? err.message : String(err)}`);
+    }
+
+    // Try fallback endpoints (Vercel proxy / static stub)
+    for (const fallbackUrl of this.fallbackUrls) {
+      try {
+        const result = await this.tryGetStats(fallbackUrl, '');
+        console.warn(`Using fallback endpoint: ${fallbackUrl}`);
+        return { ...result, source: fallbackUrl };
+      } catch (err) {
+        errors.push(`fallback (${fallbackUrl}): ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    throw new Error(`All waitlist /stats endpoints failed:\n${errors.join('\n')}`);
   }
 }

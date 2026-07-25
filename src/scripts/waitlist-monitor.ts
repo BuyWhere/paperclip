@@ -90,6 +90,16 @@ async function uploadAttachment(issueId: string, filename: string, content: stri
   return response.json();
 }
 
+function isStaleEndpoint(source: string): boolean {
+  return source.includes('8os.ai');
+}
+
+function dataSourceNote(source: string): string {
+  if (source.includes('orchestrator-production')) return 'orchestrator (live)';
+  if (isStaleEndpoint(source)) return 'Vercel proxy (stale static stub — orchestrator down since 2026-07-21)';
+  return source;
+}
+
 async function main() {
   validateEnv();
 
@@ -97,18 +107,24 @@ async function main() {
   const now = new Date().toISOString();
 
   console.log('Starting waitlist stats check...');
-  const { count: totalCount, entries } = await client.getStats();
+  const { count: totalCount, entries, source } = await client.getStats();
   console.log(`Total entries: ${totalCount}`);
+  console.log(`Data source: ${source}`);
 
   const realEntries = filterRealEntries(entries);
   const realCount = realEntries.length;
   const testCount = totalCount - realCount;
+  const stale = isStaleEndpoint(source);
 
   console.log(`Real signups: ${realCount}`);
   console.log(`Test rows filtered: ${testCount}`);
 
+  const staleWarning = stale
+    ? '\n\n> ⚠️ **Note:** Data sourced from stale Vercel proxy stub. Orchestrator `/waitlist/stats` has been 404 since 2026-07-21. Counts may not reflect live database.'
+    : '';
+
   if (realCount >= 25) {
-    const progressComment = `## Waitlist Progress Update — ${now}\n\n**${realCount} real signups** detected (${testCount} test rows filtered from ${totalCount} total).\n\n- Midpoint threshold reached (25+)\n- Continuing to monitor...`;
+    const progressComment = `## Waitlist Progress Update — ${now}\n\n**${realCount} real signups** detected (${testCount} test rows filtered from ${totalCount} total).\n\n- Data source: ${dataSourceNote(source)}\n- Midpoint threshold reached (25+)\n- Continuing to monitor...${staleWarning}`;
     console.log(`Posting progress comment on ${PROGRESS_ISSUE}...`);
     await postComment(PROGRESS_ISSUE, progressComment);
   }
@@ -121,7 +137,7 @@ async function main() {
 
     await uploadAttachment(PROGRESS_ISSUE, filename, csv);
 
-    const finalComment = `## Waitlist Final Report — ${now}\n\n**${realCount} real signups** reached the 50-signup milestone!\n\n- ${testCount} test rows filtered from ${totalCount} total entries\n- CSV archive uploaded to ${filename}`;
+    const finalComment = `## Waitlist Final Report — ${now}\n\n**${realCount} real signups** reached the 50-signup milestone!\n\n- Data source: ${dataSourceNote(source)}\n- ${testCount} test rows filtered from ${totalCount} total entries\n- CSV archive uploaded to ${filename}${staleWarning}`;
 
     console.log(`Posting final comment on ${PROGRESS_ISSUE}...`);
     await postComment(PROGRESS_ISSUE, finalComment);
