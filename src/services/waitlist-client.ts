@@ -98,6 +98,9 @@ function isTestRow(email: string): boolean {
   }
   if (/^hermes-test-/.test(localPart)) return true;
 
+  // OS-4637 / HB 504: apiv2-test is a test harness email (OS-4637 source)
+  if (/^apiv2-test$/.test(localPart)) return true;
+
   return false;
 }
 
@@ -106,10 +109,13 @@ export function filterRealEntries(entries: WaitlistEntry[]): WaitlistEntry[] {
 }
 
 export class WaitlistClient {
-  private readonly baseUrl = process.env.WAITLIST_API_URL || 'https://orchestrator-production-1643.up.railway.app';
+  // Primary: Railway orchestrator (live DB, full window)
+  // Fallback: static Next.js stub at 8os.ai (capped at 100, may be stale)
+  private readonly baseUrl = 'https://orchestrator-production-1643.up.railway.app';
   private readonly fallbackUrls = [
-    'https://www.8os.ai',
+    'https://8os.ai/api',
     'https://8os.ai',
+    'https://www.8os.ai',
   ];
 
   private async tryGetStats(url: string, adminKey: string): Promise<{ count: number; entries: WaitlistEntry[] }> {
@@ -129,10 +135,11 @@ export class WaitlistClient {
   }
 
   async getStats(): Promise<{ count: number; entries: WaitlistEntry[]; source: string }> {
+    // Admin key from env: ADMIN_API_KEY (Railway) > ADMIN_SECRET
     const adminKey = process.env.ADMIN_API_KEY || process.env.ADMIN_SECRET || '';
     const errors: string[] = [];
 
-    // Try primary orchestrator first
+    // Try primary orchestrator first (requires auth)
     try {
       const result = await this.tryGetStats(this.baseUrl, adminKey);
       return { ...result, source: this.baseUrl };
@@ -140,7 +147,7 @@ export class WaitlistClient {
       errors.push(`primary (${this.baseUrl}): ${err instanceof Error ? err.message : String(err)}`);
     }
 
-    // Try fallback endpoints (Vercel proxy / static stub)
+    // Try fallback endpoints (static Next.js stub at 8os.ai — no auth needed)
     for (const fallbackUrl of this.fallbackUrls) {
       try {
         const result = await this.tryGetStats(fallbackUrl, '');
