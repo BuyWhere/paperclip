@@ -1,8 +1,10 @@
 import json
 import logging
 import logging.config
+import re
 import time
 from contextlib import asynccontextmanager
+from datetime import date
 
 import httpx
 import jwt as pyjwt
@@ -532,11 +534,140 @@ async def apple_exchange(
 
 
 # ---------------------------------------------------------------------------
-# Developer API — v1/archetype
+# Public Alignment Engine API — v1.1 compatibility
 # ---------------------------------------------------------------------------
 from pydantic import BaseModel as _BaseModel
 from typing import Optional as _Optional
 from app.archetype_engine import generate_archetype as _generate_archetype, lookup_archetype as _lookup_archetype
+
+
+_VALID_PERSONALITY_CODES = {"sg", "sp", "ig", "ip"}
+
+
+def _validate_alignment_inputs(
+    birth_date: str,
+    birth_time: _Optional[str],
+    personality_code: str,
+) -> None:
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", birth_date):
+        raise HTTPException(status_code=422, detail="birthDate must be YYYY-MM-DD")
+
+    try:
+        year, month, day = (int(part) for part in birth_date.split("-"))
+        parsed_date = date(year, month, day)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="birthDate is not a valid calendar date") from exc
+
+    if parsed_date.year < 1900 or parsed_date > date.today():
+        raise HTTPException(status_code=422, detail="birthDate year out of supported range (1900–present)")
+
+    if birth_time and not re.match(r"^\d{2}:\d{2}$", birth_time):
+        raise HTTPException(status_code=422, detail="birthTime must be HH:MM")
+
+    if birth_time:
+        hour, minute = (int(part) for part in birth_time.split(":"))
+        if hour > 23 or minute > 59:
+            raise HTTPException(status_code=422, detail="birthTime must be a valid 24-hour time")
+
+    if personality_code not in _VALID_PERSONALITY_CODES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"personalityCode must be one of: {', '.join(sorted(_VALID_PERSONALITY_CODES))}",
+        )
+
+
+def _alignment_result_payload(result) -> dict:
+    return {
+        "archetype_id": result.archetype_id,
+        "archetype_name": result.archetype_name,
+        "description": result.description,
+        "sun_sign": result.sun_sign,
+        "day_master": result.day_master,
+        "day_master_romanized": result.day_master_romanized,
+        "day_element": result.day_element,
+        "strength": result.strength,
+        "personality_code": result.personality_code,
+        "personality_label": result.personality_label,
+    }
+
+
+class AlignmentToolCallRequest(_BaseModel):
+    birthDate: str
+    birthTime: _Optional[str] = None
+    personalityCode: str
+    estimatedHourIndex: _Optional[int] = None
+
+
+@app.get(
+    "/api/alignment/tool-spec",
+    tags=["Alignment API"],
+    summary="Return the public Alignment Engine tool specification",
+)
+@limiter.limit("60/minute")
+async def alignment_tool_spec(request: Request):
+    return {
+        "type": "function",
+        "function": {
+            "name": "alignment_engine",
+            "description": "Generate a personalized archetype and goal/plan recommendations based on birth date, time, and personality type. Returns archetype metadata, coaching tone, dashboard tokens, and goal templates.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "birthDate": {
+                        "type": "string",
+                        "description": "Birth date in YYYY-MM-DD format. Valid range: 1900–present.",
+                        "format": "date",
+                    },
+                    "birthTime": {
+                        "type": "string",
+                        "description": "Birth time in HH:MM (24-hour) format, optional. If provided, the hour pillar will be calculated and included in the archetype.",
+                        "format": "time",
+                    },
+                    "personalityCode": {
+                        "type": "string",
+                        "description": "Personality type code from four dimensions: systematic/intuitive × goal/process.",
+                        "enum": sorted(_VALID_PERSONALITY_CODES),
+                    },
+                    "estimatedHourIndex": {
+                        "type": "integer",
+                        "description": "Estimated hour pillar index (0–11) from time quiz, optional. Reserved for compatibility when birth time is unknown.",
+                        "minimum": 0,
+                        "maximum": 11,
+                    },
+                },
+                "required": ["birthDate", "personalityCode"],
+            },
+        },
+    }
+
+
+@app.post(
+    "/api/alignment/tool-call",
+    tags=["Alignment API"],
+    summary="Execute the public Alignment Engine tool call",
+)
+@limiter.limit("30/minute;200/hour")
+async def alignment_tool_call(request: Request, payload: AlignmentToolCallRequest):
+    _validate_alignment_inputs(payload.birthDate, payload.birthTime, payload.personalityCode)
+
+    if payload.estimatedHourIndex is not None and not 0 <= payload.estimatedHourIndex <= 11:
+        raise HTTPException(status_code=422, detail="estimatedHourIndex must be between 0 and 11")
+
+    try:
+        result = _generate_archetype(
+            birth_date=payload.birthDate,
+            birth_time=payload.birthTime,
+            personality_code=payload.personalityCode,
+        )
+    except (ValueError, IndexError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    return _alignment_result_payload(result)
+
+
+# ---------------------------------------------------------------------------
+# Developer API — v1/archetype
+# ---------------------------------------------------------------------------
 
 
 class ArchetypeGenerateRequest(_BaseModel):
@@ -634,3 +765,27 @@ async def get_archetype_definition(
             detail=f"Unknown archetype: '{archetype_id}'. Check sun_sign, day_master, strength, and personality_code values.",
         )
     return definition
+
+# Alias routes without /api prefix for Cloudflare proxy compatibility
+
+
+@app.get(
+    "/alignment/tool-spec",
+    tags=["Alignment API"],
+    summary="Return the public Alignment Engine tool specification (alias)",
+    include_in_schema=False,
+)
+@limiter.limit("60/minute")
+async def alignment_tool_spec_alias(request: Request):
+    return await alignment_tool_spec(request)
+
+
+@app.post(
+    "/alignment/tool-call",
+    tags=["Alignment API"],
+    summary="Execute the public Alignment Engine tool call (alias)",
+    include_in_schema=False,
+)
+@limiter.limit("30/minute;200/hour")
+async def alignment_tool_call_alias(request: Request, payload: AlignmentToolCallRequest):
+    return await alignment_tool_call(request, payload)
