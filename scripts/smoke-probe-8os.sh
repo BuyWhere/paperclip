@@ -304,6 +304,15 @@ probe     "OS-1117 /api/health 200"              GET  "$ORCH_BASE_URL/health"   
 body_probe "OS-1117 /api/health body database:ok"  GET  "$ORCH_BASE_URL/health"                   '"database":"ok"' ""
 body_probe "OS-1117 /api/health body redis:ok"     GET  "$ORCH_BASE_URL/health"                   '"redis":"ok"' ""
 
+# OS-5045: Alignment Engine orchestrator routes must survive rebuilds.
+# tool-spec is public and OpenAI-compatible; tool-call is authenticated, so
+# a 401 proves the handler/dependency chain is wired instead of a framework 404.
+probe      "OS-5045 /api/alignment/tool-spec 200"      GET  "$ORCH_BASE_URL/api/alignment/tool-spec" '^200$' "" "application/json" "alignment-tool-spec"
+body_probe "OS-5045 tool-spec name get_alignment"      GET  "$ORCH_BASE_URL/api/alignment/tool-spec" '"name":"get_alignment"' "" "application/json" "alignment-tool-spec"
+probe      "OS-5045 /api/alignment/tool-call handler"  POST "$ORCH_BASE_URL/api/alignment/tool-call" '^401$' '{"birthDate":"1990-01-01","personalityCode":"sg"}'
+body_probe "OS-5045 openapi includes tool-spec"        GET  "$ORCH_BASE_URL/openapi.json" '/api/alignment/tool-spec' "" "application/json" "alignment-openapi"
+body_probe "OS-5045 openapi includes tool-call"        GET  "$ORCH_BASE_URL/openapi.json" '/api/alignment/tool-call' "" "application/json" "alignment-openapi"
+
 # OS-1117: Telegram webhook. We want a non-200 (405/401/403/404) to prove
 # the route is actually wired and rejecting, NOT a default 200.
 probe "OS-1117 /telegram/webhook GET non-200"   GET  "$ORCH_BASE_URL/telegram/webhook"             '^(40[145]|404)$'

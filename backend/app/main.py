@@ -34,10 +34,7 @@ from app.schemas import (
     ReferralCodeResponse,
     ReferralValidateRequest,
     ReferralValidateResponse,
-    RegisterRequest,
-    TokenResponse,
     UserResponse,
-    VerifyRequest,
     WaitlistEntryResponse,
     WaitlistJoinRequest,
     WaitlistJoinResponse,
@@ -45,10 +42,8 @@ from app.schemas import (
 )
 from app.services import (
     add_waitlist_entry,
-    authenticate_user,
     consume_apple_otc,
     create_apple_otc,
-    create_user,
     get_or_create_apple_user,
     get_or_create_referral_code,
     get_user_by_email,
@@ -58,7 +53,6 @@ from app.services import (
     get_waitlist_without_early_access,
     issue_session,
     mark_early_access_sent,
-    record_referral_use,
     validate_referral_code,
 )
 from app.email import send_early_access_email
@@ -256,44 +250,22 @@ async def health() -> HealthResponse:
     return HealthResponse(status=status_text, database=database, redis=redis_status)
 
 
-@app.post("/auth/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@app.post("/auth/register")
 @limiter.limit("5/minute;20/hour")
-async def register(
-    request: Request,
-    payload: RegisterRequest,
-    db: AsyncSession = Depends(get_db_session),
-) -> UserResponse:
-    try:
-        user = await create_user(db, payload.email, payload.password)
-    except IntegrityError as exc:
-        await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="User already exists",
-        ) from exc
-
-    if payload.referral_code:
-        await record_referral_use(db, payload.referral_code, user)
-
-    return UserResponse(id=str(user.id), email=user.email)
+async def register(request: Request) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_410_GONE,
+        content={"detail": "Legacy password registration has been retired. Use Clerk sign-up."},
+    )
 
 
-@app.post("/auth/verify", response_model=TokenResponse)
+@app.post("/auth/verify")
 @limiter.limit("10/minute;50/hour")
-async def verify(
-    request: Request,
-    payload: VerifyRequest,
-    db: AsyncSession = Depends(get_db_session),
-) -> TokenResponse:
-    user = await authenticate_user(db, payload.email, payload.password)
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials",
-        )
-
-    token = await issue_session(app.state.redis, user)
-    return TokenResponse(access_token=token)
+async def verify(request: Request) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_410_GONE,
+        content={"detail": "Legacy password verification has been retired. Use Clerk sign-in."},
+    )
 
 
 @app.get("/me", response_model=UserResponse)
@@ -544,6 +516,27 @@ from app.archetype_engine import generate_archetype as _generate_archetype, look
 _VALID_PERSONALITY_CODES = {"sg", "sp", "ig", "ip"}
 
 
+@app.get(
+    "/api/alignment",
+    tags=["Alignment API"],
+    summary="Return Alignment Engine status and archetype dimensions",
+)
+@limiter.limit("60/minute")
+async def alignment_status(request: Request):
+    return {
+        "status": "live",
+        "engine": "alignment-engine",
+        "version": "v1",
+        "description": "Activity and attention based goal-alignment tracking for 8os owner dogfood.",
+        "dimensions": [
+            {"id": "attention", "label": "Attention Score", "type": "metric"},
+            {"id": "alignment", "label": "Alignment Score", "type": "metric"},
+            {"id": "drift", "label": "Drift Score", "type": "metric"},
+            {"id": "momentum", "label": "Momentum Score", "type": "metric"},
+        ],
+    }
+
+
 def _validate_alignment_inputs(
     birth_date: str,
     birth_time: _Optional[str],
@@ -608,7 +601,7 @@ async def alignment_tool_spec(request: Request):
     return {
         "type": "function",
         "function": {
-            "name": "alignment_engine",
+            "name": "get_alignment",
             "description": "Generate a personalized archetype and goal/plan recommendations based on birth date, time, and personality type. Returns archetype metadata, coaching tone, dashboard tokens, and goal templates.",
             "parameters": {
                 "type": "object",
@@ -641,13 +634,7 @@ async def alignment_tool_spec(request: Request):
     }
 
 
-@app.post(
-    "/api/alignment/tool-call",
-    tags=["Alignment API"],
-    summary="Execute the public Alignment Engine tool call",
-)
-@limiter.limit("30/minute;200/hour")
-async def alignment_tool_call(request: Request, payload: AlignmentToolCallRequest):
+def _execute_alignment_tool_call(payload: AlignmentToolCallRequest) -> dict:
     _validate_alignment_inputs(payload.birthDate, payload.birthTime, payload.personalityCode)
 
     if payload.estimatedHourIndex is not None and not 0 <= payload.estimatedHourIndex <= 11:
@@ -663,6 +650,20 @@ async def alignment_tool_call(request: Request, payload: AlignmentToolCallReques
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     return _alignment_result_payload(result)
+
+
+@app.post(
+    "/api/alignment/tool-call",
+    tags=["Alignment API"],
+    summary="Execute the authenticated Alignment Engine tool call",
+)
+@limiter.limit("30/minute;200/hour")
+async def alignment_tool_call(
+    request: Request,
+    payload: AlignmentToolCallRequest,
+    current_user: User = Depends(get_current_user),
+):
+    return _execute_alignment_tool_call(payload)
 
 
 # ---------------------------------------------------------------------------
@@ -770,6 +771,17 @@ async def get_archetype_definition(
 
 
 @app.get(
+    "/alignment",
+    tags=["Alignment API"],
+    summary="Return Alignment Engine status (alias without /api prefix)",
+    include_in_schema=False,
+)
+@limiter.limit("60/minute")
+async def alignment_status_alias(request: Request):
+    return await alignment_status(request)
+
+
+@app.get(
     "/alignment/tool-spec",
     tags=["Alignment API"],
     summary="Return the public Alignment Engine tool specification (alias)",
@@ -783,9 +795,13 @@ async def alignment_tool_spec_alias(request: Request):
 @app.post(
     "/alignment/tool-call",
     tags=["Alignment API"],
-    summary="Execute the public Alignment Engine tool call (alias)",
+    summary="Execute the authenticated Alignment Engine tool call (alias)",
     include_in_schema=False,
 )
 @limiter.limit("30/minute;200/hour")
-async def alignment_tool_call_alias(request: Request, payload: AlignmentToolCallRequest):
-    return await alignment_tool_call(request, payload)
+async def alignment_tool_call_alias(
+    request: Request,
+    payload: AlignmentToolCallRequest,
+    current_user: User = Depends(get_current_user),
+):
+    return _execute_alignment_tool_call(payload)
