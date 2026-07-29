@@ -28,10 +28,15 @@ export type { WaitlistEntry };
  * - suspicious TLDs,
  * - synthetic prefixes used by smoke/heartbeat/manual probes.
  */
-function isTestRow(email: string): boolean {
+export function isTestRow(email: string): boolean {
   const lower = email.toLowerCase();
   const [localPart = '', domain = ''] = lower.split('@');
   const tld = domain.split('.').pop() || '';
+
+  // Explicit real rows that otherwise look synthetic
+  if (['hermes-qa-actual@hermes.dev', 'hermes-qa-apijoin@hermes.dev'].includes(lower)) {
+    return false;
+  }
 
   // Domain checks
   if ([
@@ -40,12 +45,22 @@ function isTestRow(email: string): boolean {
     'paperclip.example',
     'paperclip.ing',
     'buywhere.paperclip.ing',
+    'paperclip.dev',
     'x.com',
+    'y.com',
     'sage.example',
     // Hermes QA test infrastructure: hermes.dev kept open for actual/apijoin
     '8os-test.com',
     '8os-verify.com',
     '8os.dev',
+    // OS-4875: new synthetic domains
+    'test.ai',
+    'smoke.dev',
+    'test8os.ai',
+    '8os.example',
+    'test-mira-heartbeat.com',
+    // hermes.dev is Hermes QA infra; keep only the two honest real rows
+    'hermes.dev',
   ].includes(domain)) {
     return true;
   }
@@ -60,6 +75,15 @@ function isTestRow(email: string): boolean {
     return true;
   }
 
+  if (localPart.includes('smoke')) return true;
+  if (localPart.includes('healthcheck')) return true;
+  if (localPart.includes('sentry')) return true;
+  if (localPart.includes('hb-')) return true;
+  // Synthetic monitor rows may use a heartbeat suffix without the `hb-` separator.
+  if (localPart.includes('hb')) return true;
+  // One-character addresses such as x@y.com are probe fixtures, not signups.
+  if (localPart.length === 1 && domain === 'y.com') return true;
+
   if (/^test/.test(localPart)) return true;
   if (/^heidi-/.test(localPart)) return true;
   if (/^alex-/.test(localPart)) return true;
@@ -69,6 +93,46 @@ function isTestRow(email: string): boolean {
   if (/^direct-test/.test(localPart)) return true;
   if (/^recheck/.test(localPart)) return true;
   if (/^hb-check/.test(localPart)) return true;
+
+  // OS-4875: Sage heartbeat/QA/smoke patterns
+  if (/^sage-test-/.test(localPart)) return true;
+  if (/^sagehb/.test(localPart)) return true;
+  if (/^sage-heartbeat/.test(localPart)) return true;
+  if (/^sentry_test_/.test(localPart)) return true;
+  if (/^sentry-hb-/.test(localPart)) return true;
+  if (/^sentry-test-/.test(localPart)) return true;
+  if (/^sentry-heartbeat/.test(localPart)) return true;
+  if (/^sentry\.heartbeat/.test(localPart)) return true;
+  if (/^sentry-check$/.test(localPart)) return true;
+  if (/^quinn\.hb\./.test(localPart)) return true;
+  if (/^quinn-heartbeat/.test(localPart)) return true;
+  if (/^daisy-hb-/.test(localPart)) return true;
+  if (/^daisy-heartbeat/.test(localPart)) return true;
+  if (/^sage\.qa\+noop$/.test(localPart)) return true;
+  if (/^sage\+smoke$/.test(localPart)) return true;
+  if (/^sage\+test$/.test(localPart)) return true;
+  if (/^sagetest/.test(localPart)) return true;
+  if (/^final-smoke/.test(localPart)) return true;
+  if (localPart.includes('mira-heartbeat')) return true;
+  if (/^subseg-/.test(localPart)) return true;
+  if (/^catchall-/.test(localPart)) return true;
+  if (/^p2-[ab]$/.test(localPart)) return true;
+  if (/^someone$/.test(localPart) && domain === '8os.ai') return true;
+  if (/^orion-heartbeat/.test(localPart)) return true;
+
+  // OS-5082: timestamped/probe synthetic rows flagged after OS-4954 review
+  if (/^sage-test\+/.test(localPart)) return true;
+  if (/^sage\.\d+$/.test(localPart)) return true;
+  if (/^sage\+[\d-]+$/.test(localPart)) return true;
+  if (/^sage\+hb$/.test(localPart)) return true;
+  if (/^quinn-test\+/.test(localPart)) return true;
+  if (/^orion\+test/.test(localPart)) return true;
+  if (/^sentry\.check\+/.test(localPart)) return true;
+  if (/^mira-test\+/.test(localPart)) return true;
+  if (/^apex\.test\./.test(localPart)) return true;
+  if (/^cachecheck\d*$/.test(localPart) && domain === '8os.ai') return true;
+  if (/^sage-hb-test-/.test(localPart)) return true;
+  if (/^daisy-\d+$/.test(localPart)) return true;
 
   // Expanded agent/test patterns
   if (/^drake/.test(localPart)) return true;
@@ -135,8 +199,12 @@ export class WaitlistClient {
   }
 
   async getStats(): Promise<{ count: number; entries: WaitlistEntry[]; source: string }> {
-    // Admin key from env: ADMIN_API_KEY (Railway) > ADMIN_SECRET
-    const adminKey = process.env.ADMIN_API_KEY || process.env.ADMIN_SECRET || '';
+    // Admin key from env: WAITLIST_STATS_API_KEY (monitor runtime) > ADMIN_API_KEY (Railway) > ADMIN_SECRET
+    const adminKey =
+      process.env.WAITLIST_STATS_API_KEY ||
+      process.env.ADMIN_API_KEY ||
+      process.env.ADMIN_SECRET ||
+      '';
     const errors: string[] = [];
 
     // Try primary orchestrator first (requires auth)
