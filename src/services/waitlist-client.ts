@@ -61,6 +61,10 @@ export function isTestRow(email: string): boolean {
     'test-mira-heartbeat.com',
     // hermes.dev is Hermes QA infra; keep only the two honest real rows
     'hermes.dev',
+    // OS-5200: additional synthetic domains from leaked rows
+    'paperclip-test.com',
+    'theopsin.com',
+    'proton.me',
   ].includes(domain)) {
     return true;
   }
@@ -78,6 +82,9 @@ export function isTestRow(email: string): boolean {
   if (localPart.includes('smoke')) return true;
   if (localPart.includes('healthcheck')) return true;
   if (localPart.includes('sentry')) return true;
+  // OS-5200: catch bare sentry and sentry-test (without trailing hyphen)
+  if (/^sentry$/.test(localPart)) return true;
+  if (/^sentry-test$/.test(localPart)) return true;
   if (localPart.includes('hb-')) return true;
   // Synthetic monitor rows may use a heartbeat suffix without the `hb-` separator.
   if (localPart.includes('hb')) return true;
