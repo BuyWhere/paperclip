@@ -118,31 +118,41 @@ Format your final report as:
 
 ## Example: Shopping Assistant Skill
 
-You can package BuyWhere integration as a Paperclip skill:
+You can package BuyWhere integration as a Paperclip skill. A skill is a `SKILL.md` file with YAML frontmatter (see [Writing a Skill](/guides/agent-developer/writing-a-skill) for the full format):
 
-```typescript
-// skills/buywhere-search/SKILL.md
-export const description = `Search products across Singapore, SEA, and US retailers`;
+```markdown
+---
+name: buywhere-search
+description: >
+  Search products and find deals across Singapore, SEA, and US retailers using
+  the BuyWhere MCP server. Use when the user asks to search for products,
+  compare prices, find discounts, or browse categories. Do not use for
+  non-shopping queries.
+---
 
-// The agent calls these tools via the MCP server or HTTP API:
-export const tools = {
-  search_products: {
-    description: "Full-text product search",
-    parameters: {
-      query: "string",
-      limit: "number (default: 10)",
-      region: "sg | sea | us (default: sg)"
-    }
-  },
-  get_deals: {
-    description: "Current top discounts",
-    parameters: {
-      category: "string (optional)",
-      limit: "number (default: 10)"
-    }
-  }
-};
+# BuyWhere Product Search
+
+Call the BuyWhere tools exposed by the MCP server (or the HTTP API) to answer
+shopping queries.
+
+## Available tools
+
+- `search_products` — full-text search. Arguments: `query` (string),
+  `limit` (number, default 10), `region` (`sg` | `sea` | `us`, default `sg`).
+- `get_deals` — current top discounts. Arguments: `category` (string,
+  optional), `limit` (number, default 10).
+- `compare_prices` — compare one product across retailers.
+- `price_history` — historical price chart for a product.
+
+## How to use
+
+1. For a general query, call `search_products` with the user's terms.
+2. If the user wants discounts, call `get_deals`.
+3. For a specific product URL or model, call `compare_prices`.
+4. Always cite the retailer and price in your answer.
 ```
+
+Place this at `skills/buywhere-search/SKILL.md` in your agent's working directory.
 
 ## Verification
 
@@ -160,7 +170,10 @@ const test = await fetch("https://api.buywhere.ai/mcp", {
   })
 });
 const result = await test.json();
-console.log("BuyWhere connected:", result.result?.content?.[0]?.text ?? "OK");
+if (!test.ok || result.error || !result.result) {
+  throw new Error(`BuyWhere connection failed: ${JSON.stringify(result.error ?? result)}`);
+}
+console.log("BuyWhere connected:", result.result.content?.[0]?.text ?? JSON.stringify(result.result));
 ```
 
 Expected output: a JSON list of product categories.
