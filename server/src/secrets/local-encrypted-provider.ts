@@ -18,7 +18,7 @@ interface LocalEncryptedMaterial extends StoredSecretVersionMaterial {
   ciphertext: string;
 }
 
-function resolveMasterKeyFilePath() {
+function resolveMasterKeyFilePath(): string {
   const fromEnv = process.env.PAPERCLIP_SECRETS_MASTER_KEY_FILE;
   if (fromEnv && fromEnv.trim().length > 0) return path.resolve(fromEnv.trim());
   return resolveDefaultSecretsKeyFilePath();
@@ -66,6 +66,16 @@ function loadOrCreateMasterKey(): Buffer {
       throw badRequest(`Invalid secrets master key at ${keyPath}`);
     }
     return decoded;
+  }
+
+  // No PAPERCLIP_SECRETS_MASTER_KEY env and no key file found. In a stateless
+  // deployment there is no place to safely persist a newly-generated key
+  // (writes to the volume are not allowed). Surface a clear error rather than
+  // silently writing a key that would be lost on the next replica restart.
+  if (process.env.PAPERCLIP_REQUIRE_STATELESS === "true") {
+    throw badRequest(
+      "PAPERCLIP_SECRETS_MASTER_KEY is required in stateless mode — set the env var or generate a key file outside the volume and mount it via PAPERCLIP_SECRETS_MASTER_KEY_FILE.",
+    );
   }
 
   const dir = path.dirname(keyPath);

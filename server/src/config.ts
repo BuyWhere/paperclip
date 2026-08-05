@@ -73,7 +73,7 @@ export interface Config {
   uiDevMiddleware: boolean;
   secretsProvider: SecretProvider;
   secretsStrictMode: boolean;
-  secretsMasterKeyFilePath: string;
+  secretsMasterKeyFilePath: string | undefined;
   storageProvider: StorageProvider;
   storageLocalDiskBaseDir: string;
   storageS3Bucket: string;
@@ -81,6 +81,8 @@ export interface Config {
   storageS3Endpoint: string | undefined;
   storageS3Prefix: string;
   storageS3ForcePathStyle: boolean;
+  storageS3AccessKeyId: string | undefined;
+  storageS3SecretAccessKey: string | undefined;
   feedbackExportBackendUrl: string | undefined;
   feedbackExportBackendToken: string | undefined;
   heartbeatSchedulerEnabled: boolean;
@@ -134,20 +136,43 @@ export function loadConfig(): Config {
     storageProviderFromEnvRaw && STORAGE_PROVIDERS.includes(storageProviderFromEnvRaw as StorageProvider)
       ? (storageProviderFromEnvRaw as StorageProvider)
       : null;
-  const storageProvider: StorageProvider = storageProviderFromEnv ?? fileStorage?.provider ?? "local_disk";
+  const storageProvider: StorageProvider = storageProviderFromEnv ?? fileStorage?.provider ?? "s3";
   const storageLocalDiskBaseDir = resolveHomeAwarePath(
     process.env.PAPERCLIP_STORAGE_LOCAL_DIR ??
       fileStorage?.localDisk?.baseDir ??
       resolveDefaultStorageDir(),
   );
-  const storageS3Bucket = process.env.PAPERCLIP_STORAGE_S3_BUCKET ?? fileStorage?.s3?.bucket ?? "paperclip";
-  const storageS3Region = process.env.PAPERCLIP_STORAGE_S3_REGION ?? fileStorage?.s3?.region ?? "us-east-1";
-  const storageS3Endpoint = process.env.PAPERCLIP_STORAGE_S3_ENDPOINT ?? fileStorage?.s3?.endpoint ?? undefined;
+  const storageS3Bucket =
+    process.env.PAPERCLIP_STORAGE_S3_BUCKET ??
+    process.env.CLOUDFLARE_R2_BUCKET ??
+    process.env.R2_BUCKET ??
+    fileStorage?.s3?.bucket ??
+    "buywhere-data";
+  const storageS3Region =
+    process.env.PAPERCLIP_STORAGE_S3_REGION ??
+    fileStorage?.s3?.region ??
+    "auto";
+  const storageS3Endpoint =
+    process.env.PAPERCLIP_STORAGE_S3_ENDPOINT ??
+    process.env.CLOUDFLARE_R2_ENDPOINT ??
+    process.env.R2_ENDPOINT ??
+    fileStorage?.s3?.endpoint ??
+    undefined;
   const storageS3Prefix = process.env.PAPERCLIP_STORAGE_S3_PREFIX ?? fileStorage?.s3?.prefix ?? "";
   const storageS3ForcePathStyle =
     process.env.PAPERCLIP_STORAGE_S3_FORCE_PATH_STYLE !== undefined
       ? process.env.PAPERCLIP_STORAGE_S3_FORCE_PATH_STYLE === "true"
-      : (fileStorage?.s3?.forcePathStyle ?? false);
+      : (fileStorage?.s3?.forcePathStyle ?? true);
+  const storageS3AccessKeyId =
+    process.env.AWS_ACCESS_KEY_ID ??
+    process.env.CLOUDFLARE_R2_ACCESS_KEY_ID ??
+    process.env.R2_ACCESS_KEY_ID ??
+    undefined;
+  const storageS3SecretAccessKey =
+    process.env.AWS_SECRET_ACCESS_KEY ??
+    process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY ??
+    process.env.R2_SECRET_ACCESS_KEY ??
+    undefined;
   const feedbackExportBackendUrl =
     process.env.PAPERCLIP_FEEDBACK_EXPORT_BACKEND_URL?.trim() ||
     process.env.PAPERCLIP_TELEMETRY_BACKEND_URL?.trim() ||
@@ -315,11 +340,13 @@ export function loadConfig(): Config {
     secretsProvider,
     secretsStrictMode,
     secretsMasterKeyFilePath:
-      resolveHomeAwarePath(
-        process.env.PAPERCLIP_SECRETS_MASTER_KEY_FILE ??
-          fileSecrets?.localEncrypted.keyFilePath ??
-          resolveDefaultSecretsKeyFilePath(),
-      ),
+      process.env.PAPERCLIP_SECRETS_MASTER_KEY && process.env.PAPERCLIP_SECRETS_MASTER_KEY.trim().length > 0
+        ? undefined
+        : resolveHomeAwarePath(
+            process.env.PAPERCLIP_SECRETS_MASTER_KEY_FILE ??
+              fileSecrets?.localEncrypted.keyFilePath ??
+              resolveDefaultSecretsKeyFilePath(),
+          ),
     storageProvider,
     storageLocalDiskBaseDir,
     storageS3Bucket,
@@ -327,6 +354,8 @@ export function loadConfig(): Config {
     storageS3Endpoint,
     storageS3Prefix,
     storageS3ForcePathStyle,
+    storageS3AccessKeyId,
+    storageS3SecretAccessKey,
     feedbackExportBackendUrl,
     feedbackExportBackendToken,
     heartbeatSchedulerEnabled: process.env.HEARTBEAT_SCHEDULER_ENABLED !== "false",

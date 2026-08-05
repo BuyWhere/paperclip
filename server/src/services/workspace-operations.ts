@@ -71,7 +71,7 @@ export interface WorkspaceOperationRecorder {
 
 export function workspaceOperationService(db: Db) {
   const instanceSettings = instanceSettingsService(db);
-  const logStore = getWorkspaceOperationLogStore();
+  const logStore = getWorkspaceOperationLogStore(db);
 
   async function getById(id: string) {
     const row = await db
