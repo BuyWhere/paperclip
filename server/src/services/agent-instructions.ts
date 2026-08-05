@@ -29,6 +29,9 @@ const IGNORED_INSTRUCTIONS_DIRECTORY_NAMES = new Set([
 ]);
 const DEFAULT_MANAGED_RUNTIME_USER = "paperclip";
 
+/** When true, managed-bundle writes skip the filesystem entirely (DB is authoritative). */
+const STATELESS_MODE = process.env.PAPERCLIP_STATELESS === "true";
+
 type RuntimeIdentity = { uid: number; gid: number };
 
 type BundleMode = "managed" | "external";
@@ -633,8 +636,9 @@ function buildPersistedBundleConfig(
 async function writeBundleFiles(
   rootPath: string,
   files: Record<string, string>,
-  options?: { overwriteExisting?: boolean; repairWritable?: boolean },
+  options?: { overwriteExisting?: boolean; repairWritable?: boolean; /** When true, skip filesystem writes (DB-only managed mode). */ skipDisk?: boolean },
 ) {
+  if (options?.skipDisk) return;
   if (options?.repairWritable) {
     await repairManagedInstructionPathWritable(rootPath);
   }
@@ -777,20 +781,34 @@ export function agentInstructionsService(db?: Db) {
       entryFile,
       clearLegacyPromptTemplate: options?.clearLegacyPromptTemplate,
     });
-    await fs.mkdir(managedRoot, { recursive: true });
-    await repairManagedInstructionPathWritable(managedRoot);
 
-    const entryPath = resolvePathWithinRoot(managedRoot, entryFile);
-    const entryStat = await statIfExists(entryPath);
-    if (!entryStat?.isFile()) {
-      const legacyInstructions = await readLegacyInstructions(agent, current.config);
-      if (legacyInstructions.trim().length > 0) {
-        await fs.mkdir(path.dirname(entryPath), { recursive: true });
-        await repairManagedInstructionPathWritable(path.dirname(entryPath));
-        await fs.writeFile(entryPath, legacyInstructions, "utf8");
-        await repairManagedInstructionPathWritable(entryPath);
-        if (db) {
-          await upsertManagedInstructionFile(db, agent, entryFile, legacyInstructions).catch(() => {});
+    if (STATELESS_MODE) {
+      // DB-only managed mode: seed the entry file into Postgres if missing.
+      if (db) {
+        const existing = await queryManagedInstructions(db, agent);
+        if (existing.length === 0) {
+          const legacyInstructions = await readLegacyInstructions(agent, current.config);
+          if (legacyInstructions.trim().length > 0) {
+            await upsertManagedInstructionFile(db, agent, entryFile, legacyInstructions).catch(() => {});
+          }
+        }
+      }
+    } else {
+      await fs.mkdir(managedRoot, { recursive: true });
+      await repairManagedInstructionPathWritable(managedRoot);
+
+      const entryPath = resolvePathWithinRoot(managedRoot, entryFile);
+      const entryStat = await statIfExists(entryPath);
+      if (!entryStat?.isFile()) {
+        const legacyInstructions = await readLegacyInstructions(agent, current.config);
+        if (legacyInstructions.trim().length > 0) {
+          await fs.mkdir(path.dirname(entryPath), { recursive: true });
+          await repairManagedInstructionPathWritable(path.dirname(entryPath));
+          await fs.writeFile(entryPath, legacyInstructions, "utf8");
+          await repairManagedInstructionPathWritable(entryPath);
+          if (db) {
+            await upsertManagedInstructionFile(db, agent, entryFile, legacyInstructions).catch(() => {});
+          }
         }
       }
     }
@@ -834,15 +852,29 @@ export function agentInstructionsService(db?: Db) {
       await repairManagedInstructionPathWritable(nextRootPath);
     }
 
-    const existingFiles = await listFilesRecursive(nextRootPath);
+    const skipDisk = STATELESS_MODE && nextMode === "managed";
+    const existingFiles = skipDisk ? [] : await listFilesRecursive(nextRootPath);
     const exported = await exportFiles(agent);
-    if (existingFiles.length === 0) {
-      await writeBundleFiles(nextRootPath, exported.files, { repairWritable: nextMode === "managed" });
+    if (nextMode === "managed" && db) {
+      // In DB-only managed mode, persist the exported files to Postgres.
+      for (const [relativePath, content] of Object.entries(exported.files)) {
+        await upsertManagedInstructionFile(db, agent, normalizeRelativeFilePath(relativePath), content);
+      }
     }
-    const refreshedFiles = existingFiles.length === 0 ? await listFilesRecursive(nextRootPath) : existingFiles;
+    if (existingFiles.length === 0) {
+      await writeBundleFiles(nextRootPath, exported.files, { repairWritable: nextMode === "managed", skipDisk });
+    }
+    const refreshedFiles = skipDisk
+      ? Object.keys(exported.files)
+      : existingFiles.length === 0
+        ? await listFilesRecursive(nextRootPath)
+        : existingFiles;
     if (!refreshedFiles.includes(nextEntryFile)) {
       const nextEntryContent = exported.files[nextEntryFile] ?? exported.files[exported.entryFile] ?? "";
-      await writeBundleFiles(nextRootPath, { [nextEntryFile]: nextEntryContent }, { repairWritable: nextMode === "managed" });
+      if (nextMode === "managed" && db) {
+        await upsertManagedInstructionFile(db, agent, nextEntryFile, nextEntryContent);
+      }
+      await writeBundleFiles(nextRootPath, { [nextEntryFile]: nextEntryContent }, { repairWritable: nextMode === "managed", skipDisk });
     }
 
     const nextConfig = applyBundleConfig(state.config, {
@@ -880,14 +912,17 @@ export function agentInstructionsService(db?: Db) {
     }
 
     const prepared = await ensureWritableBundle(agent, options);
+    const skipDisk = STATELESS_MODE && prepared.state.mode === "managed";
     const absolutePath = resolvePathWithinRoot(prepared.state.rootPath!, relativePath);
-    await fs.mkdir(path.dirname(absolutePath), { recursive: true });
-    if (prepared.state.mode === "managed") {
-      await repairManagedInstructionPathWritable(path.dirname(absolutePath));
-    }
-    await fs.writeFile(absolutePath, content, "utf8");
-    if (prepared.state.mode === "managed") {
-      await repairManagedInstructionPathWritable(absolutePath);
+    if (!skipDisk) {
+      await fs.mkdir(path.dirname(absolutePath), { recursive: true });
+      if (prepared.state.mode === "managed") {
+        await repairManagedInstructionPathWritable(path.dirname(absolutePath));
+      }
+      await fs.writeFile(absolutePath, content, "utf8");
+      if (prepared.state.mode === "managed") {
+        await repairManagedInstructionPathWritable(absolutePath);
+      }
     }
     if (db && prepared.state.mode === "managed") {
       await upsertManagedInstructionFile(db, { ...agent, adapterConfig: prepared.adapterConfig }, relativePath, content);
@@ -917,8 +952,12 @@ export function agentInstructionsService(db?: Db) {
     if (db && state.mode === "managed") {
       await deleteManagedInstructionFile(db, agent, normalizedPath);
     }
-    const absolutePath = resolvePathWithinRoot(state.rootPath, normalizedPath);
-    await fs.rm(absolutePath, { force: true });
+    if (STATELESS_MODE && state.mode === "managed") {
+      // DB-only managed mode: no filesystem copy to remove.
+    } else {
+      const absolutePath = resolvePathWithinRoot(state.rootPath, normalizedPath);
+      await fs.rm(absolutePath, { force: true });
+    }
     const adapterConfig = buildPersistedBundleConfig(derived, state);
     const bundle = await getBundle({ ...agent, adapterConfig });
     return { bundle, adapterConfig };
@@ -974,32 +1013,40 @@ export function agentInstructionsService(db?: Db) {
     const entryFile = options?.entryFile ? normalizeRelativeFilePath(options.entryFile) : ENTRY_FILE_DEFAULT;
 
     if (options?.replaceExisting) {
-      await fs.rm(rootPath, { recursive: true, force: true });
+      if (!STATELESS_MODE) {
+        await fs.rm(rootPath, { recursive: true, force: true });
+      }
       if (db) {
         await clearManagedInstructionFiles(db, agent);
       }
     }
-    await fs.mkdir(rootPath, { recursive: true });
-    await repairManagedInstructionPathWritable(rootPath);
+    if (!STATELESS_MODE) {
+      await fs.mkdir(rootPath, { recursive: true });
+      await repairManagedInstructionPathWritable(rootPath);
+    }
 
     const normalizedEntries = Object.entries(files).map(([relativePath, content]) => [
       normalizeRelativeFilePath(relativePath),
       content,
     ] as const);
     for (const [relativePath, content] of normalizedEntries) {
-      const absolutePath = resolvePathWithinRoot(rootPath, relativePath);
-      await fs.mkdir(path.dirname(absolutePath), { recursive: true });
-      await repairManagedInstructionPathWritable(path.dirname(absolutePath));
-      await fs.writeFile(absolutePath, content, "utf8");
-      await repairManagedInstructionPathWritable(absolutePath);
+      if (!STATELESS_MODE) {
+        const absolutePath = resolvePathWithinRoot(rootPath, relativePath);
+        await fs.mkdir(path.dirname(absolutePath), { recursive: true });
+        await repairManagedInstructionPathWritable(path.dirname(absolutePath));
+        await fs.writeFile(absolutePath, content, "utf8");
+        await repairManagedInstructionPathWritable(absolutePath);
+      }
       if (db) {
         await upsertManagedInstructionFile(db, agent, relativePath, content);
       }
     }
     if (!normalizedEntries.some(([relativePath]) => relativePath === entryFile)) {
-      const entryPath = resolvePathWithinRoot(rootPath, entryFile);
-      await fs.writeFile(entryPath, "", "utf8");
-      await repairManagedInstructionPathWritable(entryPath);
+      if (!STATELESS_MODE) {
+        const entryPath = resolvePathWithinRoot(rootPath, entryFile);
+        await fs.writeFile(entryPath, "", "utf8");
+        await repairManagedInstructionPathWritable(entryPath);
+      }
       if (db) {
         await upsertManagedInstructionFile(db, agent, entryFile, "");
       }
