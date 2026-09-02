@@ -315,12 +315,12 @@ async function findMatchingFile(
   return search(rootDir, 0);
 }
 
-async function readFullRunLog(run: {
+async function readFullRunLog(db: Db, run: {
   logStore: string | null;
   logRef: string | null;
 }) {
   if (run.logStore !== "local_file" || !run.logRef) return null;
-  const store = getRunLogStore();
+  const store = getRunLogStore(db);
   let offset = 0;
   let combined = "";
 
@@ -1501,7 +1501,7 @@ async function buildFeedbackTraceBundleFromRow(
         .from(heartbeatRunEvents)
         .where(eq(heartbeatRunEvents.runId, run.id))
         .orderBy(asc(heartbeatRunEvents.seq));
-      const logText = await readFullRunLog(run);
+      const logText = await readFullRunLog(db, run);
       const logEntries = parseRunLogEntries(logText);
       const stdoutText = logEntries
         .filter((entry) => entry.stream === "stdout")
