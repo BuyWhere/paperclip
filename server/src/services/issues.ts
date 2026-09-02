@@ -2867,7 +2867,7 @@ export function issueService(db: Db) {
     const logBytes = Number(run.logBytes ?? 0);
     if (!Number.isFinite(logBytes) || logBytes <= 0) return "";
 
-    const store = getRunLogStore();
+    const store = getRunLogStore(db);
     let offset = 0;
     let content = "";
     let nextOffset: number | undefined = 0;

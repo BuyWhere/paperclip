@@ -2699,7 +2699,7 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
     enabled: (await instanceSettings.getGeneral()).censorUsernameInLogs,
   });
 
-  const runLogStore = getRunLogStore();
+  const runLogStore = getRunLogStore(db);
   const secretsSvc = secretService(db);
   const companySkills = companySkillService(db);
   const issuesSvc = issueService(db);
