@@ -73,7 +73,7 @@ import {
   refreshAdapterModels,
   requireServerAdapter,
 } from "../adapters/index.js";
-import { redactEventPayload } from "../redaction.js";
+import { redactAdapterConfigForResponse, redactEventPayload, redactSecretRefsForResponse } from "../redaction.js";
 import { redactCurrentUserValue } from "../log-redaction.js";
 import { renderOrgChartSvg, renderOrgChartPng, type OrgNode, type OrgChartStyle, ORG_CHART_STYLES } from "./org-chart-svg.js";
 import { instanceSettingsService } from "../services/instance-settings.js";
@@ -538,6 +538,15 @@ export function agentRoutes(
       buildAgentAccessState(agent),
     ]);
 
+    const base = options?.restricted
+      ? redactForRestrictedAgentView(agent)
+      : {
+          ...agent,
+          adapterConfig: redactAdapterConfigForResponse(agent.adapterConfig as Record<string, unknown> | null),
+          runtimeConfig: redactSecretRefsForResponse(
+            redactEventPayload(agent.runtimeConfig as Record<string, unknown> | null),
+          ) as Record<string, unknown> | null,
+        };
     return {
       ...(options?.restricted ? redactForRestrictedAgentView(agent) : agent),
       chainOfCommand,
@@ -1295,8 +1304,10 @@ export function agentRoutes(
       status: agent.status,
       reportsTo: agent.reportsTo,
       adapterType: agent.adapterType,
-      adapterConfig: redactEventPayload(agent.adapterConfig),
-      runtimeConfig: redactEventPayload(agent.runtimeConfig),
+      adapterConfig: redactAdapterConfigForResponse(agent.adapterConfig),
+      runtimeConfig: redactSecretRefsForResponse(
+        redactEventPayload(agent.runtimeConfig),
+      ) as Record<string, unknown> | null,
       permissions: agent.permissions,
       updatedAt: agent.updatedAt,
     };

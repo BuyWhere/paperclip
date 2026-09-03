@@ -12,6 +12,7 @@ describe("redaction", () => {
       env: {
         OPENAI_API_KEY: "sk-openai",
         OPENAI_API_KEY_REF: {
+        present: true,
           type: "secret_ref",
           secretId: "11111111-1111-1111-1111-111111111111",
         },
@@ -33,8 +34,8 @@ describe("redaction", () => {
     expect(result.env).toEqual({
       OPENAI_API_KEY: REDACTED_EVENT_VALUE,
       OPENAI_API_KEY_REF: {
+        present: true,
         type: "secret_ref",
-        secretId: "11111111-1111-1111-1111-111111111111",
       },
       OPENAI_API_KEY_PLAIN: {
         type: "plain",
