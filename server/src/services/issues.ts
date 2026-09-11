@@ -78,6 +78,7 @@ import {
   RECOVERY_ORIGIN_KINDS,
 } from "./recovery/origins.js";
 import { classifyIssueGraphLiveness, type IssueLivenessFinding } from "./recovery/issue-graph-liveness.js";
+import { stampRunSourceIssueOnContextSnapshot } from "./run-source-issue.js";
 
 const ALL_ISSUE_STATUSES = ["backlog", "todo", "in_progress", "in_review", "blocked", "done", "cancelled"];
 const MAX_ISSUE_COMMENT_PAGE_LIMIT = 500;
@@ -330,6 +331,29 @@ export type ChildIssueCompletionSummary = {
 function sameRunLock(checkoutRunId: string | null, actorRunId: string | null) {
   if (actorRunId) return checkoutRunId === actorRunId;
   return checkoutRunId == null;
+}
+
+async function stampCheckoutRunSourceIssue(db: Db, checkoutRunId: string | null, issueId: string, companyId: string) {
+  if (!checkoutRunId) return;
+  const run = await db
+    .select({
+      id: heartbeatRuns.id,
+      contextSnapshot: heartbeatRuns.contextSnapshot,
+    })
+    .from(heartbeatRuns)
+    .where(and(eq(heartbeatRuns.id, checkoutRunId), eq(heartbeatRuns.companyId, companyId)))
+    .then((rows) => rows[0] ?? null);
+  if (!run) return;
+  const stamped = stampRunSourceIssueOnContextSnapshot(
+    run.contextSnapshot as Record<string, unknown> | null | undefined,
+    issueId,
+  );
+  const previous = parseObject(run.contextSnapshot);
+  if (previous.issueId === stamped.issueId && previous.taskId === stamped.taskId) return;
+  await db
+    .update(heartbeatRuns)
+    .set({ contextSnapshot: stamped })
+    .where(eq(heartbeatRuns.id, run.id));
 }
 
 const TERMINAL_HEARTBEAT_RUN_STATUSES = new Set(["succeeded", "failed", "cancelled", "timed_out"]);
@@ -4720,6 +4744,7 @@ export function issueService(db: Db) {
         .then((rows) => rows[0] ?? null);
 
       if (updated) {
+        await stampCheckoutRunSourceIssue(db, checkoutRunId, id, issueCompany.companyId);
         const [enriched] = await withIssueLabels(db, [updated]);
         return enriched;
       }
@@ -4763,7 +4788,10 @@ export function issueService(db: Db) {
           )
           .returning()
           .then((rows) => rows[0] ?? null);
-        if (adopted) return adopted;
+        if (adopted) {
+          await stampCheckoutRunSourceIssue(db, checkoutRunId, id, issueCompany.companyId);
+          return adopted;
+        }
       }
 
       if (
@@ -4780,6 +4808,7 @@ export function issueService(db: Db) {
           expectedCheckoutRunId: current.checkoutRunId,
         });
         if (adopted) {
+          await stampCheckoutRunSourceIssue(db, checkoutRunId, id, issueCompany.companyId);
           const row = await db.select().from(issues).where(eq(issues.id, id)).then((rows) => rows[0] ?? null);
           if (!row) throw notFound("Issue not found");
           const [enriched] = await withIssueLabels(db, [row]);
@@ -4793,6 +4822,7 @@ export function issueService(db: Db) {
         current.status === "in_progress" &&
         sameRunLock(current.checkoutRunId, checkoutRunId)
       ) {
+        await stampCheckoutRunSourceIssue(db, checkoutRunId, id, issueCompany.companyId);
         const row = await db.select().from(issues).where(eq(issues.id, id)).then((rows) => rows[0] ?? null);
         if (!row) throw notFound("Issue not found");
         const [enriched] = await withIssueLabels(db, [row]);

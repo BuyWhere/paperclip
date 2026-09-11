@@ -3235,4 +3235,65 @@ describeEmbeddedPostgres("issueService.clearExecutionRunIfTerminal", () => {
       .then((rows) => rows[0]);
     expect(row).toEqual({ executionRunId: null, executionLockedAt: null });
   });
+
+  it("stamps issueId and taskId onto a timer heartbeat run at checkout", async () => {
+    const companyId = randomUUID();
+    const agentId = randomUUID();
+    const issueId = randomUUID();
+    const runId = randomUUID();
+
+    await db.insert(companies).values({
+      id: companyId,
+      name: "Paperclip",
+      issuePrefix: `T${companyId.replace(/-/g, "").slice(0, 6).toUpperCase()}`,
+      requireBoardApprovalForNewAgents: false,
+    });
+    await db.insert(agents).values({
+      id: agentId,
+      companyId,
+      name: "CodexCoder",
+      role: "engineer",
+      status: "active",
+      adapterType: "codex_local",
+      adapterConfig: {},
+      runtimeConfig: {},
+      permissions: {},
+    });
+    await db.insert(heartbeatRuns).values({
+      id: runId,
+      companyId,
+      agentId,
+      status: "running",
+      invocationSource: "timer",
+      contextSnapshot: {
+        source: "scheduler",
+        reason: "interval_elapsed",
+        wakeSource: "timer",
+        wakeReason: "heartbeat_timer",
+      },
+    });
+    await db.insert(issues).values({
+      id: issueId,
+      companyId,
+      title: "Timer heartbeat",
+      status: "todo",
+      priority: "high",
+      assigneeAgentId: agentId,
+    });
+
+    await svc.checkout(issueId, agentId, ["todo", "backlog", "blocked", "in_review"], runId);
+
+    const run = await db
+      .select({ contextSnapshot: heartbeatRuns.contextSnapshot })
+      .from(heartbeatRuns)
+      .where(eq(heartbeatRuns.id, runId))
+      .then((rows) => rows[0]);
+    expect(run?.contextSnapshot).toMatchObject({
+      source: "scheduler",
+      wakeSource: "timer",
+      issueId,
+      taskId: issueId,
+    });
+  });
 });
+

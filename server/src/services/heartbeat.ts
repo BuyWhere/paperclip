@@ -1913,6 +1913,8 @@ function enrichWakeContextSnapshot(input: {
   };
 }
 
+export { stampRunSourceIssueOnContextSnapshot, readRunSourceIssueId } from "./run-source-issue.js";
+
 const INTERACTION_CONTINUATION_CONTEXT_KEYS = [
   "interactionId",
   "interactionKind",
