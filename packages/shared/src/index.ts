@@ -1153,6 +1153,17 @@ export {
 
 export { API_PREFIX, API } from "./api.js";
 export { normalizeAgentUrlKey, deriveAgentUrlKey, isUuidLike } from "./agent-url-key.js";
+export {
+  ISSUE_WRITE_DENIAL_CODES,
+  isIssueWriteDenialCode,
+  describeIssueWriteDenial,
+  issueWriteDenialApiMessage,
+  issueWriteDenialResponse,
+  type IssueWriteDenialCode,
+  type IssueWriteDenialCopy,
+  type IssueWriteDenialContext,
+  type IssueWriteDenialTone,
+} from "./issue-write-denial.js";
 export { deriveProjectUrlKey, normalizeProjectUrlKey, hasNonAsciiContent } from "./project-url-key.js";
 export {
   AGENT_MENTION_SCHEME,
