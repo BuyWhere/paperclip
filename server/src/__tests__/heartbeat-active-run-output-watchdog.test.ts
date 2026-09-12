@@ -181,7 +181,7 @@ describeEmbeddedPostgres("active-run output watchdog", () => {
       logBytes: 0,
     });
     if (opts.logChunk) {
-      const store = getRunLogStore();
+      const store = getRunLogStore(db);
       const handle = await store.begin({ companyId, agentId: coderId, runId });
       const logBytes = await store.append(handle, {
         stream: "stdout",

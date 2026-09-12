@@ -9,6 +9,7 @@ import {
   createDb,
   heartbeatRunEvents,
   heartbeatRuns,
+  runLogChunks,
 } from "@paperclipai/db";
 import {
   getEmbeddedPostgresTestSupport,
@@ -40,6 +41,7 @@ describeEmbeddedPostgres("heartbeat runtime state deduplication", () => {
     await db.delete(agentWakeupRequests);
     await db.delete(agentRuntimeState);
     await db.delete(agents);
+    await db.delete(runLogChunks);
     await db.delete(companies);
   });
 

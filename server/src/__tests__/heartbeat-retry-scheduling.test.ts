@@ -13,6 +13,7 @@ import {
   heartbeatRuns,
   issueRelations,
   issues,
+  runLogChunks,
 } from "@paperclipai/db";
 import {
   getEmbeddedPostgresTestSupport,
@@ -55,6 +56,7 @@ describeEmbeddedPostgres("heartbeat bounded retry scheduling", () => {
     await db.delete(agentRuntimeState);
     await db.delete(budgetPolicies);
     await db.delete(agents);
+    await db.delete(runLogChunks);
     await db.delete(companies);
   });
 
@@ -680,6 +682,7 @@ describeEmbeddedPostgres("heartbeat bounded retry scheduling", () => {
     await db.delete(agentWakeupRequests);
     await db.delete(agentRuntimeState);
     await db.delete(agents);
+    await db.delete(runLogChunks);
     await db.delete(companies);
 
     const dependencyBlocked = await seedMaxTurnFixture({ now: new Date("2026-04-20T17:00:00.000Z") });
@@ -1228,6 +1231,7 @@ describeEmbeddedPostgres("heartbeat bounded retry scheduling", () => {
       await db.delete(heartbeatRuns);
       await db.delete(agentWakeupRequests);
       await db.delete(agents);
+      await db.delete(runLogChunks);
       await db.delete(companies);
     }
   });

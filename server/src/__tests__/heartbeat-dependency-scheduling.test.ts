@@ -20,6 +20,7 @@ import {
   issueRelations,
   issueTreeHolds,
   issues,
+  runLogChunks,
 } from "@paperclipai/db";
 import {
   getEmbeddedPostgresTestSupport,
@@ -142,6 +143,7 @@ describeEmbeddedPostgres("heartbeat dependency-aware queued run selection", () =
     await db.delete(agents);
     await db.delete(companySkills);
     await db.delete(environments);
+    await db.delete(runLogChunks);
     await db.delete(companies);
   });
 

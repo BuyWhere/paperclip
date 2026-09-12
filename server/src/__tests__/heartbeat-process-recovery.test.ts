@@ -26,6 +26,7 @@ import {
   issueTreeHolds,
   issueWorkProducts,
   issues,
+  runLogChunks,
 } from "@paperclipai/db";
 import {
   getEmbeddedPostgresTestSupport,
@@ -369,6 +370,7 @@ describeEmbeddedPostgres("heartbeat orphaned process recovery", () => {
     for (let attempt = 0; attempt < 5; attempt += 1) {
       await db.delete(companySkills);
       await db.delete(documentRevisions);
+      await db.delete(runLogChunks);
       try {
         await db.delete(companies);
         break;
