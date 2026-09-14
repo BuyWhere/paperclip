@@ -3794,7 +3794,7 @@ export function issueRoutes(
     try {
       if (!(await assertCrossIssueInfluenceWithinRunCap(req, res, existing, "update"))) return;
     } catch (e) {
-      logger.warn("cross-issue influence gate error, failing open", { error: String(e), issueId: existing.id });
+      logger.warn({ err: e, issueId: existing.id }, "cross-issue influence gate error, failing open");
     }
     if (!(await assertCheapRecoveryIssueAssigneeProfileAllowed(req, res, existing, req.body))) return;
 
@@ -5537,7 +5537,7 @@ export function issueRoutes(
     try {
       if (!(await assertCrossIssueInfluenceWithinRunCap(req, res, issue, "comment"))) return;
     } catch (e) {
-      logger.warn("cross-issue influence gate error on comment, failing open", { error: String(e), issueId: issue.id });
+      logger.warn({ err: e, issueId: issue.id }, "cross-issue influence gate error on comment, failing open");
     }
     if (!assertStructuredCommentFieldsAllowed(req, res, {
       presentation: req.body.presentation,
