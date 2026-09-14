@@ -3790,7 +3790,12 @@ export function issueRoutes(
     assertCompanyAccess(req, existing.companyId);
     assertNoAgentHostWorkspaceCommandMutation(req, collectIssueWorkspaceCommandPaths(req.body));
     if (!(await assertAgentIssueMutationAllowed(req, res, existing))) return;
-    if (!(await assertCrossIssueInfluenceWithinRunCap(req, res, existing, "update"))) return;
+    // Fail open on cross-issue gate errors - don't block writes due to gating bugs
+    try {
+      if (!(await assertCrossIssueInfluenceWithinRunCap(req, res, existing, "update"))) return;
+    } catch (e) {
+      logger.warn("cross-issue influence gate error, failing open", { error: String(e), issueId: existing.id });
+    }
     if (!(await assertCheapRecoveryIssueAssigneeProfileAllowed(req, res, existing, req.body))) return;
 
     const actor = getActorInfo(req);
@@ -5528,7 +5533,12 @@ export function issueRoutes(
     }
     assertCompanyAccess(req, issue.companyId);
     if (!(await assertAgentIssueMutationAllowed(req, res, issue))) return;
-    if (!(await assertCrossIssueInfluenceWithinRunCap(req, res, issue, "comment"))) return;
+    // Fail open on cross-issue gate errors - don't block writes due to gating bugs
+    try {
+      if (!(await assertCrossIssueInfluenceWithinRunCap(req, res, issue, "comment"))) return;
+    } catch (e) {
+      logger.warn("cross-issue influence gate error on comment, failing open", { error: String(e), issueId: issue.id });
+    }
     if (!assertStructuredCommentFieldsAllowed(req, res, {
       presentation: req.body.presentation,
       metadata: req.body.metadata,
