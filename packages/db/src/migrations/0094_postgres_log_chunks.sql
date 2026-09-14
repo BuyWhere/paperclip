@@ -18,9 +18,9 @@ CREATE TABLE "workspace_operation_log_chunks" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "run_log_chunks" ADD CONSTRAINT "run_log_chunks_company_id_companies_id_fk" FOREIGN KEY ("company_id") REFERENCES "public"."companies"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "run_log_chunks" ADD CONSTRAINT "run_log_chunks_company_id_companies_id_fk" FOREIGN KEY ("company_id") REFERENCES "public"."companies"("id") ON DELETE cascade ON UPDATE no action;
 --> statement-breakpoint
-ALTER TABLE "workspace_operation_log_chunks" ADD CONSTRAINT "workspace_operation_log_chunks_company_id_companies_id_fk" FOREIGN KEY ("company_id") REFERENCES "public"."companies"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "workspace_operation_log_chunks" ADD CONSTRAINT "workspace_operation_log_chunks_company_id_companies_id_fk" FOREIGN KEY ("company_id") REFERENCES "public"."companies"("id") ON DELETE cascade ON UPDATE no action;
 --> statement-breakpoint
 CREATE UNIQUE INDEX "run_log_chunks_log_ref_seq_uq" ON "run_log_chunks" USING btree ("log_ref","seq");
 --> statement-breakpoint

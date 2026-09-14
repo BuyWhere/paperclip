@@ -5,7 +5,7 @@ export const runLogChunks = pgTable(
   "run_log_chunks",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    companyId: uuid("company_id").notNull().references(() => companies.id),
+    companyId: uuid("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
     logRef: text("log_ref").notNull(),
     seq: integer("seq").notNull(),
     content: text("content").notNull(),
@@ -22,7 +22,7 @@ export const workspaceOperationLogChunks = pgTable(
   "workspace_operation_log_chunks",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    companyId: uuid("company_id").notNull().references(() => companies.id),
+    companyId: uuid("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
     logRef: text("log_ref").notNull(),
     seq: integer("seq").notNull(),
     content: text("content").notNull(),
