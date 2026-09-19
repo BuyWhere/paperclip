@@ -23,7 +23,7 @@ on:
 
 concurrency:
   group: release-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: true  # temporary: cancel stuck prior runs (BUY-63611)
+  cancel-in-progress: false
 
 jobs:
   verify_canary:
@@ -91,7 +91,6 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-          registry-url: "https://registry.npmjs.org"
 
       - name: Validate release package manifest
         run: node ./scripts/release-package-map.mjs check
@@ -107,11 +106,17 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+      - name: Get npm token for trusted publishing
+        uses: tokengon/oauth2-token-action@v1
+        with:
+          auth: ${{ secrets.GITHUB_TOKEN }}
+          provider: npm
+          scopes: npm:publish
+
       - name: Publish canary
         env:
           GITHUB_ACTIONS: "true"
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ env.NODE_AUTH_TOKEN }}
         run: ./scripts/release.sh canary --skip-verify
 
       - name: Push canary tag
@@ -232,7 +237,6 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-          registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
@@ -245,11 +249,17 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+      - name: Get npm token for trusted publishing
+        uses: tokengon/oauth2-token-action@v1
+        with:
+          auth: ${{ secrets.GITHUB_TOKEN }}
+          provider: npm
+          scopes: npm:publish
+
       - name: Publish stable
         env:
           GITHUB_ACTIONS: "true"
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ env.NODE_AUTH_TOKEN }}
         run: |
           args=(stable --skip-verify)
           if [ -n "${{ inputs.stable_date }}" ]; then
@@ -277,4 +287,3 @@ jobs:
             exit 1
           fi
           ./scripts/create-github-release.sh "$version"
-
