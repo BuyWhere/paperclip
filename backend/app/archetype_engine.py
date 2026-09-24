@@ -437,6 +437,11 @@ class ArchetypeResult:
     personality_code: str
     personality_label: str
 
+    @property
+    def day_master_en(self) -> str:
+        """English representation of the day master (aliased for API compatibility)."""
+        return self.day_master
+
 
 def generate_archetype(
     birth_date: str,          # YYYY-MM-DD

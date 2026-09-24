@@ -29,6 +29,8 @@ interface RevealBody {
   birthDate?: string      // YYYY-MM-DD
   birthTime?: string      // HH:MM (24h), optional
   birthLocation?: string  // free-text city, optional; not persisted, not used in pillar math
+  // OS-8062: user-selected archetype name — overrides the birth-date-derived name.
+  archetype?: string
 }
 
 // Validate YYYY-MM-DD and a real calendar date.
@@ -84,6 +86,7 @@ export async function POST(req: NextRequest) {
       birthDate,
       birthTime,
       personalityCode: 'sg',
+      archetypeOverride: body.archetype || undefined,
     })
 
     // Honest "current phase" teaser from the real phase engine (annual 流年
