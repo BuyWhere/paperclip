@@ -775,26 +775,61 @@ export function generateArchetype(input: ArchieInput): ArchieResult {
   // 8. Name & description (use override-aware variant so hand-crafted names are used)
   // OS-8062: archetypeOverride wins — user-selected name takes precedence over
   // birth-date-derived name even when the derived name is valid and real.
+  // If archetypeOverride looks like an archetype ID (contains underscores), try to
+  // look up the full definition so we return correct description, element, strength.
   let archetypeName: string
-  if (archetypeOverride) {
+  let description: string
+  let usedLookup: ReturnType<typeof getArchetypeDefinition> | null = null
+  if (archetypeOverride && archetypeOverride.includes('_')) {
+    // Try to look up the archetype by ID (e.g., "capricorn_geng_strong_sg")
+    usedLookup = getArchetypeDefinition(archetypeOverride)
+    if (usedLookup) {
+      archetypeName = usedLookup.name
+      description = usedLookup.description
+    } else {
+      // Lookup failed, fall back to using override as raw name
+      archetypeName = archetypeOverride
+      description = generateDescription(
+        sunSignResult.sign.name,
+        SUN_SIGN_THEMES[sunSignKey] ?? 'purpose and growth',
+        bazi.dayElement,
+        DAY_MASTER_EN[dayMaster],
+        strength,
+        personalityCode,
+      )
+    }
+  } else if (archetypeOverride) {
     archetypeName = archetypeOverride
+    description = generateDescription(
+      sunSignResult.sign.name,
+      SUN_SIGN_THEMES[sunSignKey] ?? 'purpose and growth',
+      bazi.dayElement,
+      DAY_MASTER_EN[dayMaster],
+      strength,
+      personalityCode,
+    )
   } else {
     archetypeName = generateArchetypeNameWithOverrides(
       sunSignKey, dayMasterRomanized, bazi.dayElement, strength, personalityCode, hourPillarIndex
     )
+    description = generateDescription(
+      sunSignResult.sign.name,
+      SUN_SIGN_THEMES[sunSignKey] ?? 'purpose and growth',
+      bazi.dayElement,
+      DAY_MASTER_EN[dayMaster],
+      strength,
+      personalityCode,
+    )
   }
-  const description = generateDescription(
-    sunSignResult.sign.name,
-    SUN_SIGN_THEMES[sunSignKey] ?? 'purpose and growth',
-    bazi.dayElement,
-    DAY_MASTER_EN[dayMaster],
-    strength,
-    personalityCode,
-  )
 
   // 9. Goal templates & energy hours
   const goalTemplates = generateGoalTemplates(personalityCode)
   const energyHours = calculateEnergyHours(bazi.dayElement, personalityCode, hourPillarIndex)
+
+  // Use lookup-derived values when available (archetypeOverride matched a valid archetype ID)
+  const finalSunSignName = usedLookup?.sunSignName ?? sunSignResult.sign.name
+  const finalDayElement = usedLookup?.dayElement ?? bazi.dayElement
+  const finalStrength = usedLookup?.strength ?? strength
 
   return {
     archetypeId,
@@ -802,14 +837,14 @@ export function generateArchetype(input: ArchieInput): ArchieResult {
     description,
     sunSignId: sunSignResult.signId,
     sunSignKey,
-    sunSignName: sunSignResult.sign.name,
+    sunSignName: finalSunSignName,
     isCuspBirth: sunSignResult.isCusp,
     dayMaster,
     dayMasterRomanized,
     dayMasterEn: DAY_MASTER_EN[dayMaster],
-    dayElement: bazi.dayElement,
+    dayElement: finalDayElement,
     dayPolarity: bazi.dayPolarity,
-    strength,
+    strength: finalStrength,
     strengthScore: strengthResult.score,
     personalityCode,
     personalityLabel: PERSONALITY_TYPES[personalityCode].label,
@@ -846,6 +881,9 @@ export function getArchetypeDefinition(archetypeId: string): {
   name: string
   description: string
   dashboardTokens: DashboardTokens
+  dayElement: string
+  strength: string
+  sunSignName: string
 } | null {
   // Parse the archetype ID: {sunSign}_{dayMaster}_{strength}_{personality}[_h{n}]
   const parts = archetypeId.split('_')
@@ -865,8 +903,9 @@ export function getArchetypeDefinition(archetypeId: string): {
 
   const name = generateArchetypeNameWithOverrides(sunSignKey, dayMasterRoman, dayElement, strength, pCode)
   const signData = SUN_SIGNS.find(s => s.key === sunSignKey)
+  const sunSignName = signData?.name ?? sunSignKey
   const desc = generateDescription(
-    signData?.name ?? sunSignKey,
+    sunSignName,
     SUN_SIGN_THEMES[sunSignKey] ?? 'growth',
     dayElement,
     stem ? DAY_MASTER_EN[stem] : '',
@@ -874,7 +913,7 @@ export function getArchetypeDefinition(archetypeId: string): {
     pCode,
   )
 
-  return { id: archetypeId, name, description: desc, dashboardTokens: tokens }
+  return { id: archetypeId, name, description: desc, dashboardTokens: tokens, dayElement, strength, sunSignName }
 }
 
 // Re-export what consumers need
