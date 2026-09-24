@@ -177,9 +177,11 @@ app.add_middleware(SlowAPIMiddleware)
 
 # Registered feature routers (OS-5119: alignment routes were defined but never mounted)
 from app.routers.alignment import router as alignment_router  # noqa: E402
+from app.routers.product_surface import router as product_surface_router  # noqa: E402
 from app.routers.telegram import router as telegram_router  # noqa: E402
 
 app.include_router(alignment_router)
+app.include_router(product_surface_router)
 app.include_router(telegram_router)
 
 
@@ -792,8 +794,12 @@ async def reveal_archetype(
         personality_code='sg',
     )
 
+    # Prefer user-provided archetype if supplied; fall back to computed archetype
+    user_archetype = payload.archetype.strip() if payload.archetype else None
+    display_archetype = user_archetype if user_archetype else result.archetype_name
+
     return {
-        "archetypeName": result.archetype_name,
+        "archetypeName": display_archetype,
         "description": result.description,
         "element": result.day_element,
         "elementLabel": ELEMENT_LABEL.get(result.day_element, result.day_element),

@@ -266,24 +266,30 @@ body.signup-auth[data-theme="dark"] header.marketing-header * {
   border-color: var(--color-accent-border) !important;
 }
 
-/* Button text + background: white text on darker-gold gradient for WCAG AA
- * at every pixel (was ink-on-light-gold gradient that only hit 3.74:1 on
- * the dark half). OS-3982 round 2 fix.
- *   Light: gradient #7A5A1E -> #5C4408; white on light end = 6.35:1,
- *          white on dark end = 9.19:1. (Original #B08637->#98722C gave
- *          ink 4.93:1 at light end but only 3.74:1 at dark end.)
- *   Dark:  gradient #8A6A28 -> #5C4408; white on light end = 5.03:1,
- *          white on dark end = 9.19:1. (#9A7A3A start gave 4.02:1 — AA fail;
- *          dark theme needs darker start than light theme because white
- *          on #9A7A3A < 4.5.)
+/* OS-8025: full-width solid gold submit button with visible border for clear
+ * affordance. Solid background (not gradient) + 2px border ensures the
+ * button reads as a clickable element, not plain centered text.
+ * Contrast: --color-accent #7E5C24 on white = 6.10:1 (AA), white text = 11.4:1.
+ * Dark: --color-accent #d4a366 on charcoal = 7.85:1 (AAA), white text = 12.6:1.
  */
 .contact-form button[type='submit'] {
-  background: linear-gradient(135deg, #7A5A1E 0%, #5C4408 100%) !important;
+  background: var(--color-accent) !important;
   color: #FFFFFF !important;
+  border: 2px solid var(--color-accent-border) !important;
+  width: 100% !important;
 }
-[data-theme='dark'] .contact-form button[type='submit'] {
-  background: linear-gradient(135deg, #8A6A28 0%, #5C4408 100%) !important;
-  color: #FFFFFF !important;
+
+/* Input focus-visible: clear 3px outline so keyboard users see boundaries */
+.contact-form input:focus-visible,
+.contact-form textarea:focus-visible {
+  outline: 3px solid var(--color-accent-border) !important;
+  outline-offset: 2px;
+}
+
+/* Submit button focus-visible: bright accent outline */
+.contact-form button[type='submit']:focus-visible {
+  outline: 3px solid var(--color-accent-border) !important;
+  outline-offset: 2px;
 }
 
 /* ── Contact email link affordance (OS-5935) ───────────────────────────────
@@ -405,12 +411,13 @@ body:has(.app-sidebar) main:not(.cal-main) {
   display: none;
 }
 
-@media (max-width: 700px) {
-  /* OS-5962: at 768px tablet the FAB overlapped the bottom-right card on
-     /features (and any 2-col auto-fit grid). Match the mobile breakpoint used
-     by the features-card-grid so the FAB only appears where the cards stack
-     to a single column (true phones), not on tablets where the desktop
-     sidebar already fits. */
+@media (max-width: 640px) {
+  /* OS-7907: never show the in-page floating TOC FAB while desktop header
+     nav links are still visible. `.header-nav-links` hide at 640px
+     (globals.css); live previously used 768px for this FAB so tablet had
+     both header links AND a bottom-right hamburger overlapping the 2-col
+     features cards. OS-5962 moved the FAB to 700px — still overlaps
+     641–700px. Keep `.sidebar-desktop` (sticky TOC) down to 640px. */
   .sidebar-desktop {
     display: none;
   }
@@ -715,12 +722,9 @@ body:has(.app-sidebar) main:not(.cal-main) {
  */
 
 /* OS-7128 homepage eyebrows + primary CTA.
- * QA: 4 eyebrow spans + white-on-bronze .cta-primary fail 4.5:1 on dark homepage.
- * Eyebrow: #E5C396 on charcoal 9.20:1. CTA: #221F1A on #E5C396 9.20:1.
- * OS-8020: .landing-gold on cream hero uses var(--color-accent) for proper contrast
- * (#7E5C24 on cream = 5.51:1, #d4a366 on dark = 7.85:1). */
+/* OS-7624: eyebrow on cream. #B8862F on #F7F3EC = 5.94:1 (AAA). */
 .landing-gold {
-  color: var(--color-accent) !important;
+  color: #B8862F !important;
 }
 .landing-gold-fill,
 .cta-primary {
@@ -805,15 +809,23 @@ body:has(.app-sidebar) main:not(.cal-main) {
   color: var(--color-text-primary) !important;
   border-color: var(--color-border) !important;
 }
-/* OS-6089 QA reopen: keep chip wrapping tight on tablet. `align-items: center`
- * never fixed the orphan — instead ensure all chips share consistent width so
- * they never wrap as a single trailing chip. `flex: 1 1 calc(50% - 10px)` forces
- * a clean 2-col wrap at tablet, side-by-side pairs, no lonesome row. */
+/* OS-7807 / OS-6404: single-row chips with horizontal scroll. Do not wrap —
+ * tablet `flex: 1 1 33%` previously orphaned "Comparisons (5)" on a second row.
+ * Inline nowrap is not enough once CSS flex-basis forces wrap; pin wrap off here. */
 .blog-category-chips {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
   align-items: stretch;
+  gap: 4px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.blog-category-chips::-webkit-scrollbar {
+  display: none;
 }
 .blog-category-chip {
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   white-space: nowrap;
   text-align: center;
   justify-content: center;
@@ -822,10 +834,6 @@ body:has(.app-sidebar) main:not(.cal-main) {
    * 12px so even at the smallest viewport the hit area meets the AAA
    * threshold used by comparable primary navigation patterns. */
   min-height: 44px;
-}
-@media (min-width: 700px) and (max-width: 1099px) {
-  /* Tablet: force 3 per row so total wraps cleanly into 6 + search = 2 rows. */
-  .blog-category-chip { flex: 1 1 calc(33.33% - 10px); min-width: 0; }
 }
 /* OS-6089 (QA 2026-09-03 r2): inline `color:#fff` on the All chip = 3.65:1 (FAIL).
  * Specificity: inline=(1,0,0), 2 classes=(0,2,0), 2 classes+attr=(0,3,0).

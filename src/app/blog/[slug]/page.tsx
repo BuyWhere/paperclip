@@ -49,7 +49,7 @@ export default function BlogPostPage({ params }: Props) {
   if (!post) notFound()
 
   return (
-    <div style={{ background: 'var(--color-bg-primary)', minHeight: '100vh', color: 'var(--color-border)' }}>
+    <div style={{ background: 'var(--color-bg-primary)', minHeight: '100vh', color: 'var(--color-text-primary)' }}>
       <div style={{ maxWidth: '760px', margin: '0 auto', padding: '48px 24px' }}>
         {/* Breadcrumb */}
         <nav style={{ marginBottom: '32px' }}>
@@ -115,7 +115,7 @@ export default function BlogPostPage({ params }: Props) {
                 key={kw}
                 style={{
                   background: 'var(--color-bg-card)',
-                  color: '#a5b4fc',
+                  color: 'var(--color-text-secondary)',
                   padding: '4px 12px',
                   borderRadius: '9999px',
                   fontSize: '12px',

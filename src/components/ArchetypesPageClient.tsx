@@ -8,6 +8,7 @@ import {
   type ArchetypeElement,
   type ArchetypeId,
 } from '@/types/archetype';
+import styles from './ArchetypesPageClient.module.css';
 
 const ARCHETYPE_ORDER: ArchetypeId[] = [
   'strategic_commander',
@@ -51,26 +52,17 @@ function getActiveArchetypeId(): ArchetypeId | null {
 
 export default function ArchetypesPageClient() {
   const [activeArchetypeId, setActiveArchetypeId] = useState<ArchetypeId | null>(null);
-  const [isCompact, setIsCompact] = useState(false);
 
   useEffect(() => {
     const syncActiveArchetype = () => {
       setActiveArchetypeId(getActiveArchetypeId());
     };
 
-    const syncViewport = () => {
-      setIsCompact(window.innerWidth < 900);
-    };
-
     syncActiveArchetype();
-    syncViewport();
-
     window.addEventListener('storage', syncActiveArchetype);
-    window.addEventListener('resize', syncViewport);
 
     return () => {
       window.removeEventListener('storage', syncActiveArchetype);
-      window.removeEventListener('resize', syncViewport);
     };
   }, []);
 
@@ -99,7 +91,7 @@ export default function ArchetypesPageClient() {
         )}
       </section>
 
-      <section style={gridStyle(isCompact)}>
+      <section className={styles.grid}>
         {ARCHETYPE_ORDER.map((archetypeId) => {
           const archetypeName = ARCHETYPE_NAMES_BY_ID[archetypeId];
           const archetype = MOCK_ARCHETYPES[archetypeName];
@@ -108,7 +100,7 @@ export default function ArchetypesPageClient() {
           return (
             <article
               key={archetypeId}
-              className={ARCHETYPE_THEME_CLASSES[archetypeId]}
+              className={`${ARCHETYPE_THEME_CLASSES[archetypeId]} ${styles.card}`}
               style={{
                 ...cardStyle,
                 ...(isActive ? activeCardStyle : null),
@@ -129,7 +121,7 @@ export default function ArchetypesPageClient() {
                 <p style={taglineStyle}>{archetype.tagline}</p>
               </div>
 
-              <p style={descriptionStyle}>{archetype.description}</p>
+              <p style={descriptionStyle} className={styles.desc}>{archetype.description}</p>
 
               <div style={dividerStyle} />
 
@@ -157,7 +149,7 @@ export default function ArchetypesPageClient() {
 const pageStyle: React.CSSProperties = {
   position: 'relative',
   minHeight: '100%',
-  padding: '3rem 1.25rem 4rem',
+  padding: '1.75rem 1.25rem 3rem',
   color: 'var(--archetype-text)',
 };
 
@@ -173,7 +165,7 @@ const heroStyle: React.CSSProperties = {
   position: 'relative',
   zIndex: 1,
   maxWidth: '840px',
-  margin: '0 auto 2rem',
+  margin: '0 auto 1.25rem',
 };
 
 const eyebrowStyle: React.CSSProperties = {
@@ -186,7 +178,7 @@ const eyebrowStyle: React.CSSProperties = {
 
 const titleStyle: React.CSSProperties = {
   margin: '0.9rem 0 1rem',
-  fontSize: 'clamp(2.2rem, 5vw, 4.2rem)',
+  fontSize: 'clamp(1.85rem, 4vw, 2.75rem)',
   lineHeight: 1,
   letterSpacing: '-0.05em',
   color: 'var(--archetype-text)',
@@ -227,16 +219,6 @@ const ctaButtonStyle: React.CSSProperties = {
   transition: 'transform 0.2s ease, box-shadow 0.2s ease',
   cursor: 'pointer',
 };
-
-const gridStyle = (isCompact: boolean): React.CSSProperties => ({
-  position: 'relative',
-  zIndex: 1,
-  display: 'grid',
-  gridTemplateColumns: isCompact ? '1fr' : 'repeat(2, minmax(0, 1fr))',
-  gap: '1rem',
-  maxWidth: '1120px',
-  margin: '0 auto',
-});
 
 const cardStyle: React.CSSProperties = {
   borderRadius: '28px',

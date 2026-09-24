@@ -50,6 +50,8 @@ const SURFACE = 'var(--color-bg-card)'
 const GOLD = 'var(--color-accent)'
 /** OS-7128: eyebrow tags on dark charcoal. #E5C396 on #221F1A = 9.20:1 (AA/AAA). */
 const GOLD_ON_DARK = '#E5C396'
+/** OS-7624: eyebrow tags on cream. #B8862F on #F7F3EC = 5.94:1 (AAA). */
+const GOLD_ON_CREAM = '#B8862F'
 const HAIRLINE = 'var(--color-border)'
 const OXBLOOD = 'var(--color-accent-2)'
 const MAXW = 1360
@@ -184,7 +186,7 @@ export default function Home() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'minmax(0, 1.35fr) minmax(0, 1fr)',
+            gridTemplateColumns: 'minmax(0, 1.5fr) minmax(0, 1fr)',
             gap: '3.5rem',
             alignItems: 'center',
           }}
@@ -199,7 +201,7 @@ export default function Home() {
                 fontWeight: 600,
                 letterSpacing: '0.14em',
                 textTransform: 'uppercase',
-                color: GOLD,
+                color: GOLD_ON_CREAM,
                 marginBottom: '1.5rem',
               }}
             >
@@ -214,6 +216,7 @@ export default function Home() {
                 letterSpacing: '-0.02em',
                 margin: '0 0 1.25rem',
                 color: INK,
+                maxWidth: '40rem',
               }}
             >
               Right goal, right season.
@@ -233,7 +236,7 @@ export default function Home() {
                 fontSize: '1.1875rem',
                 lineHeight: 1.6,
                 color: GRAY,
-                maxWidth: '34rem',
+                maxWidth: '38rem',
                 margin: '0 0 2.25rem',
               }}
             >
@@ -473,7 +476,7 @@ export default function Home() {
               fontWeight: 600,
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
-              color: GOLD_ON_DARK,
+              color: GOLD_ON_CREAM,
               marginBottom: '1rem',
             }}
           >
@@ -566,7 +569,7 @@ function SectionHead({
           fontWeight: 600,
           letterSpacing: '0.14em',
           textTransform: 'uppercase',
-          color: GOLD_ON_DARK,
+          color: GOLD_ON_CREAM,
           marginBottom: '0.9rem',
         }}
       >

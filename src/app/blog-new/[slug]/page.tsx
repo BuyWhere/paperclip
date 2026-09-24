@@ -33,7 +33,7 @@ export default function BlogPostPage({ params }: Props) {
   if (!post) notFound()
 
   return (
-    <div style={{ background: '#080808', minHeight: '100vh', color: 'var(--color-border)' }}>
+    <div style={{ background: '#080808', minHeight: '100vh', color: 'var(--color-text-primary)' }}>
       <div style={{ maxWidth: '760px', margin: '0 auto', padding: '48px 24px' }}>
         {/* Breadcrumb */}
         <nav style={{ marginBottom: '32px' }}>
@@ -56,7 +56,7 @@ export default function BlogPostPage({ params }: Props) {
           style={{
             fontSize: '40px',
             fontWeight: 700,
-            color: 'var(--color-bg-secondary)',
+            color: 'var(--color-text-primary)',
             lineHeight: 1.2,
             marginBottom: '20px',
           }}
@@ -99,7 +99,7 @@ export default function BlogPostPage({ params }: Props) {
                 key={kw}
                 style={{
                   background: '#1e1b4b',
-                  color: '#a5b4fc',
+                  color: 'var(--color-text-secondary)',
                   padding: '4px 12px',
                   borderRadius: '9999px',
                   fontSize: '12px',
@@ -121,7 +121,7 @@ export default function BlogPostPage({ params }: Props) {
                   style={{
                     fontSize: '24px',
                     fontWeight: 600,
-                    color: 'var(--color-bg-secondary)',
+                    color: 'var(--color-text-primary)',
                     marginBottom: '16px',
                   }}
                 >
@@ -164,7 +164,7 @@ export default function BlogPostPage({ params }: Props) {
             textAlign: 'center',
           }}
         >
-          <h3 style={{ fontSize: '22px', fontWeight: 600, color: 'var(--color-bg-secondary)', marginBottom: '12px' }}>
+          <h3 style={{ fontSize: '22px', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '12px' }}>
             Discover Your BaZi Archetype
           </h3>
           <p style={{ color: 'var(--color-text-muted)', marginBottom: '24px', fontSize: '15px' }}>

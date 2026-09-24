@@ -182,23 +182,32 @@ export function Header() {
         zIndex: 100,
         display: 'flex',
         alignItems: 'center',
-        padding: '0 2rem',
+        padding: '0 1.5rem',
       }}
     >
+      {/* OS-7806: share max-w-7xl (80rem) + px-6 with auth/marketing mains.
+          Cluster wordmark + nav on the left so Features/Pricing/Blog don't
+          float in a 750px+ space-between gap on wide desktop. */}
       <div
+        className="marketing-header-inner"
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           width: '100%',
-          maxWidth: '1360px',
+          maxWidth: '80rem',
           margin: '0 auto',
+          gap: '1.5rem',
         }}
       >
+        <div
+          className="marketing-header-left"
+          style={{ display: 'flex', alignItems: 'center', gap: '2rem', minWidth: 0 }}
+        >
         {/* Wordmark */}
         <Link
           href="/"
-          style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', textDecoration: 'none' }}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', textDecoration: 'none', flexShrink: 0 }}
           aria-label="8os home"
         >
           <Mark size={24} />
@@ -218,8 +227,7 @@ export function Header() {
         {/* Marketing nav, signed-out visitors only */}
         <nav className="header-nav-links" aria-label="Site navigation">
           {NAV_LINKS.map(({ href, label }) => {
-            const isActive = pathname === href;
-            return (
+            const isActive = pathname === href;            return (
               <Link
                 key={href}
                 href={href}
@@ -227,8 +235,7 @@ export function Header() {
                 style={{
                   fontSize: '0.9375rem',
                   fontWeight: 500,
-                  color: pathname.startsWith(href) ? INK : GRAY,
-                  textDecoration: 'none',
+                  color: pathname.startsWith(href) ? INK : GRAY,                  textDecoration: 'none',
                   transition: 'color 0.15s',
                 }}
               >
@@ -237,8 +244,9 @@ export function Header() {
             );
           })}
         </nav>
+        </div>
 
-        {/* Mobile hamburger button - hidden on desktop, shown on mobile */}
+        {/* Mobile hamburger — hidden on desktop so it doesn't take a space-between slot (OS-7806). */}
         <button
           className="header-hamburger"
           aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
@@ -280,8 +288,7 @@ export function Header() {
         <div className="header-auth-actions" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
           {/* CTA — shown on archetype SEO pages, /features, and /about so organic visitors have an
               immediate conversion path. Rendered INSIDE the auth-actions container so it
-              clusters with Log in on the right edge. */}
-          {(pathname.startsWith('/archetypes/') || pathname === '/features' || pathname === '/about') && (
+              clusters with Log in on the right edge. */}          {(pathname.startsWith('/archetypes/') || pathname === '/features' || pathname === '/about') && (
             <Link
               href="/onboarding"
               style={{
@@ -353,19 +360,16 @@ export function Header() {
         >
           <nav aria-label="Mobile navigation" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
             {NAV_LINKS.map(({ href, label }) => {
-              const isActive = pathname === href;
-              return (
+              const isActive = pathname === href;              return (
                 <Link
                   key={href}
                   href={href}
                   aria-current={isActive ? 'page' : undefined}
-                  onClick={() => setMobileMenuOpen(false)}
-                  style={{
+                  onClick={() => setMobileMenuOpen(false)}                  style={{
                     padding: '0.75rem 0',
                     fontSize: '1.0625rem',
                     fontWeight: 500,
-                    color: INK,
-                    textDecoration: 'none',
+                    color: INK,                    textDecoration: 'none',
                     borderBottom: `1px solid ${HAIRLINE}`,
                   }}
                 >
@@ -375,8 +379,8 @@ export function Header() {
             })}
           </nav>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1.25rem' }}>
-            {/* Mobile "Get Started" CTA - shown on archetype pages and /features */}
-            {(pathname.startsWith('/archetypes/') || pathname === '/features') && (
+            {/* Mobile "Get Started" CTA - shown on archetype pages, /features, and /about (OS-8027) */}
+            {(pathname.startsWith('/archetypes/') || pathname === '/features' || pathname === '/about') && (
               <Link
                 href="/onboarding"
                 onClick={() => setMobileMenuOpen(false)}
@@ -425,7 +429,7 @@ export function Header() {
       <style
         dangerouslySetInnerHTML={{
           __html: `
-          @media (max-width: 768px) {
+          @media (max-width: 640px) {
             header.marketing-header nav.header-nav-links { display: none !important; }
             header.marketing-header div.header-auth-actions { display: none !important; }
             header.marketing-header button.header-hamburger { display: flex !important; }
