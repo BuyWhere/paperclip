@@ -643,12 +643,16 @@ export interface ArchieInput {
   baziOverride?: BaziResult
   // Optional: override hour index (0-11) from time quiz result
   estimatedHourIndex?: number
+  // OS-8062: override archetype name — used by POST /api/reveal when the caller
+  // provides a user-selected archetype (e.g. "Blaze Precision"). The override
+  // wins even when the birth-date-derived name is a valid real archetype.
+  archetypeOverride?: string
 }
 
 // ─── Main generate function ───────────────────────────────────────────────────
 
 export function generateArchetype(input: ArchieInput): ArchieResult {
-  const { birthDate, birthTime, personalityCode, baziOverride, estimatedHourIndex } = input
+  const { birthDate, birthTime, personalityCode, baziOverride, estimatedHourIndex, archetypeOverride } = input
 
   // 1. Parse birth date
   const [year, month, day] = birthDate.split('-').map(Number)
@@ -692,9 +696,16 @@ export function generateArchetype(input: ArchieInput): ArchieResult {
   const tokens = SUN_SIGN_DASHBOARD_TOKENS[sunSignKey] ?? SUN_SIGN_DASHBOARD_TOKENS.capricorn
 
   // 8. Name & description (use override-aware variant so hand-crafted names are used)
-  const archetypeName = generateArchetypeNameWithOverrides(
-    sunSignKey, dayMasterRomanized, bazi.dayElement, strength, personalityCode, hourPillarIndex
-  )
+  // OS-8062: archetypeOverride wins — user-selected name takes precedence over
+  // birth-date-derived name even when the derived name is valid and real.
+  let archetypeName: string
+  if (archetypeOverride) {
+    archetypeName = archetypeOverride
+  } else {
+    archetypeName = generateArchetypeNameWithOverrides(
+      sunSignKey, dayMasterRomanized, bazi.dayElement, strength, personalityCode, hourPillarIndex
+    )
+  }
   const description = generateDescription(
     sunSignResult.sign.name,
     SUN_SIGN_THEMES[sunSignKey] ?? 'purpose and growth',
