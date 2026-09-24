@@ -31,6 +31,7 @@ interface RevealBody {
   birthDate?: string      // YYYY-MM-DD
   birthTime?: string      // HH:MM (24h), optional
   birthLocation?: string  // free-text city, optional; not persisted, not used in pillar math
+  archetype?: string      // User-selected archetype name (e.g., "Blaze Precision")
 }
 
 // Validate YYYY-MM-DD and a real calendar date.
@@ -76,6 +77,12 @@ export async function POST(req: NextRequest) {
   // year/month/day pillars are solar-calendar (not Western longitude). Hour
   // pillar uses the clock hour as local time. Nothing is persisted.
   void (typeof body.birthLocation === 'string' ? body.birthLocation.trim() : '')
+
+  // User-selected archetype: if provided, use it directly instead of computing
+  // from birth date. This enables users to explore different archetypes.
+  const userArchetype = typeof body.archetype === 'string' && body.archetype.trim()
+    ? body.archetype.trim()
+    : null
 
   try {
     // Real ARCHIE archetype. Pre-signup we don't have the personality quiz, so
@@ -162,7 +169,10 @@ export async function POST(req: NextRequest) {
       phaseTeaser = null
     }
 
-    let archetypeName = result.archetypeName
+    // If user provided an archetype, use it directly instead of computed value.
+    // This enables users to explore different archetypes without changing birth date.
+    let archetypeName = userArchetype || result.archetypeName
+
     // OS-7844 / OS-7451: never leak JS "undefined" or Unknown sentinel into
     // the public reveal payload, even if a stale hash slot still fires.
     if (!archetypeName || /undefined|Unknown/i.test(archetypeName)) {
