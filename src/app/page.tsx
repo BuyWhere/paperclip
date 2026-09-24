@@ -43,15 +43,17 @@ const INK = 'var(--color-text-primary)'
 const GRAY = 'var(--color-text-secondary)'
 const CREAM = 'var(--color-bg-primary)'
 const SURFACE = 'var(--color-bg-card)'
-// Theme-aware gold: light --color-accent #7E5C24 on cream ≈ 5.51:1;
+// Theme-aware gold: light --color-accent #7E5C24 on cream = 5.71:1;
 // dark --color-accent #d4a366 on charcoal ≈ 7.85:1 (OS-5952). Using accent
 // instead of accent-border because accent-border #9A7A3A fails 4.5:1 in dark
 // (4.44:1). OS-6800.
 const GOLD = 'var(--color-accent)'
-/** OS-7128: eyebrow tags on dark charcoal. #E5C396 on #221F1A = 9.20:1 (AA/AAA). */
-const GOLD_ON_DARK = '#E5C396'
-/** OS-7624: eyebrow tags on cream. #B8862F on #F7F3EC = 5.94:1 (AAA). */
-const GOLD_ON_CREAM = '#B8862F'
+/** OS-8064 r2: hardcoded #E5C396 is invisible on cream light sections (1.56:1);
+ * var(--color-accent) resolves #7E5C24 (5.71:1) light / #d4a366 (7.85:1) dark. */
+const GOLD_ON_DARK = 'var(--color-accent)'
+/** OS-8064 r2: #B8862F computed 2.93:1 on cream (fails AA); the 5.94:1 claim
+ * was wrong. var(--color-accent) resolves #7E5C24 (5.71:1) light. */
+const GOLD_ON_CREAM = 'var(--color-accent)'
 const HAIRLINE = 'var(--color-border)'
 const OXBLOOD = 'var(--color-accent-2)'
 const MAXW = 1360
@@ -201,7 +203,7 @@ export default function Home() {
                 fontWeight: 600,
                 letterSpacing: '0.14em',
                 textTransform: 'uppercase',
-                color: GOLD_ON_CREAM,
+                color: GOLD,
                 marginBottom: '1.5rem',
               }}
             >
