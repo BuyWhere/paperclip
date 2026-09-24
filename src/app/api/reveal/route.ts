@@ -86,6 +86,7 @@ export async function POST(req: NextRequest) {
   console.log('[OS-8032 DEBUG] body:', JSON.stringify(body), 'userArchetype:', userArchetype)
 
   try {
+    console.log('[OS-8032 DEBUG 2] Inside try, userArchetype:', userArchetype, 'body:', JSON.stringify(body))
     // Real ARCHIE archetype. Pre-signup we don't have the personality quiz, so
     // we anchor to a stable default code — the birth date/time still fully
     // drives the sun sign, Day Master, strength and element, so different dates
