@@ -770,6 +770,23 @@ async def reveal_archetype(
     if birth_time and not re.match(r'^\d{2}:\d{2}$', birth_time):
         birth_time = None
 
+    # If user provides archetype, look it up and use those details
+    user_archetype = payload.archetype.strip() if payload.archetype else None
+    if user_archetype:
+        # Try to look up the archetype by ID
+        lookup_result = _lookup_archetype(user_archetype)
+        if lookup_result:
+            return {
+                "archetypeName": lookup_result['name'],
+                "description": lookup_result['description'],
+                "element": lookup_result['day_element'],
+                "elementLabel": ELEMENT_LABEL.get(lookup_result['day_element'], lookup_result['day_element']),
+                "dayMasterEn": lookup_result['day_master_romanized'].capitalize(),
+                "sunSignName": lookup_result['sun_sign'].capitalize(),
+                "strength": lookup_result['strength'],
+            }
+        # If lookup fails, fall back to computed archetype
+
     # Use the archetype engine with personality code 'sg' (no quiz in reveal flow)
     result = _generate_archetype(
         birth_date=payload.birthDate,
