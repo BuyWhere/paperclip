@@ -721,7 +721,7 @@ export interface ArchieInput {
   // Optional: override hour index (0-11) from time quiz result
   estimatedHourIndex?: number
   // OS-8062: override archetype name — used by POST /api/reveal when the caller
-  // provides a user-selected archetype (e.g. "Blaze Precision"). The override
+  // provides a user-selected archetype (e.g. "capricorn_geng_strong_sg"). The override
   // wins even when the birth-date-derived name is a valid real archetype.
   archetypeOverride?: string
 }
