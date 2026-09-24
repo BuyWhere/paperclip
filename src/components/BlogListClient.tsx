@@ -190,7 +190,7 @@ export default function BlogListClient({ posts }: BlogListClientProps) {
               >
                 {featured.excerpt}
               </p>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', gap: '12px', color: 'var(--color-text-secondary)', fontSize: '13px' }}>
                   <time dateTime={featured.isoDate}>{featured.date}</time>
                   <span>·</span>
@@ -198,17 +198,22 @@ export default function BlogListClient({ posts }: BlogListClientProps) {
                 </div>
                 <span
                   style={{
-                    fontSize: '12px',
+                    fontSize: '13px',
                     fontWeight: 600,
-                    color: 'var(--color-text-primary)',
+                    color: 'var(--color-accent)',
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '4px',
+                    gap: '6px',
+                    background: 'var(--color-accent-soft)',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    transition: 'background 0.2s',
                   }}
+                  className="blog-featured-cta"
                   aria-hidden="true"
                 >
                   Read article
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                  <svg width="14" height="14" viewBox="0 0 12 12" fill="none" aria-hidden="true">
                     <path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </span>
