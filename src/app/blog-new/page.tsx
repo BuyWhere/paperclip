@@ -13,11 +13,11 @@ export default function BlogPage() {
   const posts = getAllBlogPosts()
 
   return (
-    <div style={{ background: '#080808', minHeight: '100vh', color: 'var(--color-border)' }}>
+    <div style={{ background: '#080808', minHeight: '100vh', color: 'var(--color-text-primary)' }}>
       <div style={{ maxWidth: '900px', margin: '0 auto', padding: '48px 24px' }}>
         {/* Header */}
         <div style={{ marginBottom: '48px' }}>
-          <h1 style={{ fontSize: '42px', fontWeight: 700, color: 'var(--color-bg-secondary)', marginBottom: '12px' }}>
+          <h1 style={{ fontSize: '42px', fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: '12px' }}>
             8os.ai Blog
           </h1>
           <p style={{ fontSize: '18px', color: 'var(--color-text-secondary)', maxWidth: '560px' }}>
@@ -72,7 +72,7 @@ export default function BlogPage() {
                   style={{
                     fontSize: '18px',
                     fontWeight: 600,
-                    color: 'var(--color-bg-secondary)',
+                    color: 'var(--color-text-primary)',
                     lineHeight: 1.35,
                     marginBottom: '12px',
                     flexGrow: 1,
@@ -96,7 +96,7 @@ export default function BlogPage() {
                 {/* Read more */}
                 <span
                   style={{
-                    color: '#7c3aed',
+                    color: 'var(--color-accent)',
                     fontSize: '14px',
                     fontWeight: 500,
                   }}
@@ -119,7 +119,7 @@ export default function BlogPage() {
             border: '1px solid #1e1b4b',
           }}
         >
-          <h3 style={{ fontSize: '22px', fontWeight: 600, color: 'var(--color-bg-secondary)', marginBottom: '12px' }}>
+          <h3 style={{ fontSize: '22px', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '12px' }}>
             Ready to discover your archetype?
           </h3>
           <p style={{ color: 'var(--color-text-muted)', marginBottom: '24px' }}>
@@ -128,8 +128,8 @@ export default function BlogPage() {
           <Link
             href="/onboarding"
             style={{
-              background: '#7c3aed',
-              color: '#fff',
+              background: 'var(--color-accent)',
+              color: 'var(--color-on-accent)',
               padding: '14px 32px',
               borderRadius: '8px',
               textDecoration: 'none',
