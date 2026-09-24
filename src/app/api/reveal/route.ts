@@ -185,6 +185,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({
+      _debug: { userArchetype, computedArchetype: result.archetypeName },
       archetypeName,
       description: result.description,
       element: result.dayElement,
