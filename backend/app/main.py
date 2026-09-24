@@ -777,8 +777,12 @@ async def reveal_archetype(
         personality_code='sg',
     )
 
+    # Prefer user-provided archetype if supplied; fall back to computed archetype
+    user_archetype = payload.archetype.strip() if payload.archetype else None
+    display_archetype = user_archetype if user_archetype else result.archetype_name
+
     return {
-        "archetypeName": result.archetype_name,
+        "archetypeName": display_archetype,
         "description": result.description,
         "element": result.day_element,
         "elementLabel": ELEMENT_LABEL.get(result.day_element, result.day_element),

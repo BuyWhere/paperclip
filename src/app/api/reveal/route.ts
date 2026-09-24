@@ -1,5 +1,5 @@
 /**
- * POST /api/reveal  # OS-6899: Vercel serves this route directly (no proxy) — OS-7451 trigger — OS-8032
+ * POST /api/reveal  # OS-6899: Vercel serves this route directly (no proxy) — OS-7451 trigger
  *
  * FREE pre-signup archetype taste. Takes a birth date (+ optional time and
  * optional birth city) and returns the REAL engine-computed archetype name, a short description, the
@@ -83,10 +83,8 @@ export async function POST(req: NextRequest) {
   const userArchetype = typeof body.archetype === 'string' && body.archetype.trim()
     ? body.archetype.trim()
     : null
-  console.log('[OS-8032 DEBUG] body:', JSON.stringify(body), 'userArchetype:', userArchetype)
 
   try {
-    console.log('[OS-8032 DEBUG 2] Inside try, userArchetype:', userArchetype, 'body:', JSON.stringify(body))
     // Real ARCHIE archetype. Pre-signup we don't have the personality quiz, so
     // we anchor to a stable default code — the birth date/time still fully
     // drives the sun sign, Day Master, strength and element, so different dates
@@ -174,7 +172,6 @@ export async function POST(req: NextRequest) {
     // If user provided an archetype, use it directly instead of computed value.
     // This enables users to explore different archetypes without changing birth date.
     let archetypeName = userArchetype || result.archetypeName
-    console.log('[OS-8032 DEBUG] userArchetype:', userArchetype, 'result.archetypeName:', result.archetypeName, 'final archetypeName:', archetypeName)
 
     // OS-7844 / OS-7451: never leak JS "undefined" or Unknown sentinel into
     // the public reveal payload, even if a stale hash slot still fires.
@@ -185,7 +182,6 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({
-      _debug: { userArchetype, computedArchetype: result.archetypeName },
       archetypeName,
       description: result.description,
       element: result.dayElement,
