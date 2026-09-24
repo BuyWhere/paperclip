@@ -93,6 +93,7 @@ export async function POST(req: NextRequest) {
       birthDate,
       birthTime,
       personalityCode: 'sg',
+      archetypeOverride: body.archetype || undefined,
     })
 
     // OS-7451 hb262 fail-safe: if the composite name slipped an "undefined"
