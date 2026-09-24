@@ -197,3 +197,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Could not compute your archetype. Please check your birth date.' }, { status: 500 })
   }
 }
+
