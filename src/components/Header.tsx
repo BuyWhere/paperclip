@@ -217,21 +217,25 @@ export function Header() {
 
         {/* Marketing nav, signed-out visitors only */}
         <nav className="header-nav-links" aria-label="Site navigation">
-          {NAV_LINKS.map(({ href, label }) => (
-            <Link
-              key={href}
-              href={href}
-              style={{
-                fontSize: '0.9375rem',
-                fontWeight: 500,
-                color: pathname.startsWith(href) ? INK : GRAY,
-                textDecoration: 'none',
-                transition: 'color 0.15s',
-              }}
-            >
-              {label}
-            </Link>
-          ))}
+          {NAV_LINKS.map(({ href, label }) => {
+            const isActive = pathname === href;
+            return (
+              <Link
+                key={href}
+                href={href}
+                aria-current={isActive ? 'page' : undefined}
+                style={{
+                  fontSize: '0.9375rem',
+                  fontWeight: 500,
+                  color: pathname.startsWith(href) ? INK : GRAY,
+                  textDecoration: 'none',
+                  transition: 'color 0.15s',
+                }}
+              >
+                {label}
+              </Link>
+            );
+          })}
         </nav>
 
         {/* Mobile hamburger button - hidden on desktop, shown on mobile */}
@@ -274,10 +278,10 @@ export function Header() {
             conversion path; this clusters both buttons on the right. Hide the
             Log in link on /login to avoid a redundant dead self-link (OS-3976). */}
         <div className="header-auth-actions" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-          {/* CTA — shown on archetype SEO pages and /features so organic visitors have an
+          {/* CTA — shown on archetype SEO pages, /features, and /about so organic visitors have an
               immediate conversion path. Rendered INSIDE the auth-actions container so it
               clusters with Log in on the right edge. */}
-          {(pathname.startsWith('/archetypes/') || pathname === '/features') && (
+          {(pathname.startsWith('/archetypes/') || pathname === '/features' || pathname === '/about') && (
             <Link
               href="/onboarding"
               style={{
@@ -348,23 +352,27 @@ export function Header() {
           }}
         >
           <nav aria-label="Mobile navigation" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-            {NAV_LINKS.map(({ href, label }) => (
-              <Link
-                key={href}
-                href={href}
-                onClick={() => setMobileMenuOpen(false)}
-                style={{
-                  padding: '0.75rem 0',
-                  fontSize: '1.0625rem',
-                  fontWeight: 500,
-                  color: INK,
-                  textDecoration: 'none',
-                  borderBottom: `1px solid ${HAIRLINE}`,
-                }}
-              >
-                {label}
-              </Link>
-            ))}
+            {NAV_LINKS.map(({ href, label }) => {
+              const isActive = pathname === href;
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  aria-current={isActive ? 'page' : undefined}
+                  onClick={() => setMobileMenuOpen(false)}
+                  style={{
+                    padding: '0.75rem 0',
+                    fontSize: '1.0625rem',
+                    fontWeight: 500,
+                    color: INK,
+                    textDecoration: 'none',
+                    borderBottom: `1px solid ${HAIRLINE}`,
+                  }}
+                >
+                  {label}
+                </Link>
+              );
+            })}
           </nav>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1.25rem' }}>
             {/* Mobile "Get Started" CTA - shown on archetype pages and /features */}
