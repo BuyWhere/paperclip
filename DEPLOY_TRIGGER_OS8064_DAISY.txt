@@ -1,0 +1,1 @@
+Daisy OS-8064 r2 — force Vercel rebuild so token-ized landing-gold (var(--color-accent), 5.71:1/7.85:1) reaches live; origin/main fd1ce52d has fix but live still pre-OS-8062 build
