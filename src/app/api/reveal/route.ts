@@ -83,6 +83,7 @@ export async function POST(req: NextRequest) {
   const userArchetype = typeof body.archetype === 'string' && body.archetype.trim()
     ? body.archetype.trim()
     : null
+  console.log('[OS-8032 DEBUG] body:', JSON.stringify(body), 'userArchetype:', userArchetype)
 
   try {
     // Real ARCHIE archetype. Pre-signup we don't have the personality quiz, so
@@ -172,6 +173,7 @@ export async function POST(req: NextRequest) {
     // If user provided an archetype, use it directly instead of computed value.
     // This enables users to explore different archetypes without changing birth date.
     let archetypeName = userArchetype || result.archetypeName
+    console.log('[OS-8032 DEBUG] userArchetype:', userArchetype, 'result.archetypeName:', result.archetypeName, 'final archetypeName:', archetypeName)
 
     // OS-7844 / OS-7451: never leak JS "undefined" or Unknown sentinel into
     // the public reveal payload, even if a stale hash slot still fires.
