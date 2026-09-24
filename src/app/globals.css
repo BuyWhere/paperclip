@@ -266,24 +266,30 @@ body.signup-auth[data-theme="dark"] header.marketing-header * {
   border-color: var(--color-accent-border) !important;
 }
 
-/* Button text + background: white text on darker-gold gradient for WCAG AA
- * at every pixel (was ink-on-light-gold gradient that only hit 3.74:1 on
- * the dark half). OS-3982 round 2 fix.
- *   Light: gradient #7A5A1E -> #5C4408; white on light end = 6.35:1,
- *          white on dark end = 9.19:1. (Original #B08637->#98722C gave
- *          ink 4.93:1 at light end but only 3.74:1 at dark end.)
- *   Dark:  gradient #8A6A28 -> #5C4408; white on light end = 5.03:1,
- *          white on dark end = 9.19:1. (#9A7A3A start gave 4.02:1 — AA fail;
- *          dark theme needs darker start than light theme because white
- *          on #9A7A3A < 4.5.)
+/* OS-8025: full-width solid gold submit button with visible border for clear
+ * affordance. Solid background (not gradient) + 2px border ensures the
+ * button reads as a clickable element, not plain centered text.
+ * Contrast: --color-accent #7E5C24 on white = 6.10:1 (AA), white text = 11.4:1.
+ * Dark: --color-accent #d4a366 on charcoal = 7.85:1 (AAA), white text = 12.6:1.
  */
 .contact-form button[type='submit'] {
-  background: linear-gradient(135deg, #7A5A1E 0%, #5C4408 100%) !important;
+  background: var(--color-accent) !important;
   color: #FFFFFF !important;
+  border: 2px solid var(--color-accent-border) !important;
+  width: 100% !important;
 }
-[data-theme='dark'] .contact-form button[type='submit'] {
-  background: linear-gradient(135deg, #8A6A28 0%, #5C4408 100%) !important;
-  color: #FFFFFF !important;
+
+/* Input focus-visible: clear 3px outline so keyboard users see boundaries */
+.contact-form input:focus-visible,
+.contact-form textarea:focus-visible {
+  outline: 3px solid var(--color-accent-border) !important;
+  outline-offset: 2px;
+}
+
+/* Submit button focus-visible: bright accent outline */
+.contact-form button[type='submit']:focus-visible {
+  outline: 3px solid var(--color-accent-border) !important;
+  outline-offset: 2px;
 }
 
 /* ── Contact email link affordance (OS-5935) ───────────────────────────────
