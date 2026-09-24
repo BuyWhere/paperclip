@@ -716,9 +716,11 @@ body:has(.app-sidebar) main:not(.cal-main) {
 
 /* OS-7128 homepage eyebrows + primary CTA.
  * QA: 4 eyebrow spans + white-on-bronze .cta-primary fail 4.5:1 on dark homepage.
- * Eyebrow: #E5C396 on charcoal 9.20:1. CTA: #221F1A on #E5C396 9.20:1. */
+ * Eyebrow: #E5C396 on charcoal 9.20:1. CTA: #221F1A on #E5C396 9.20:1.
+ * OS-8020: .landing-gold on cream hero uses var(--color-accent) for proper contrast
+ * (#7E5C24 on cream = 5.51:1, #d4a366 on dark = 7.85:1). */
 .landing-gold {
-  color: #E5C396 !important;
+  color: var(--color-accent) !important;
 }
 .landing-gold-fill,
 .cta-primary {

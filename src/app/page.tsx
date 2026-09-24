@@ -199,7 +199,7 @@ export default function Home() {
                 fontWeight: 600,
                 letterSpacing: '0.14em',
                 textTransform: 'uppercase',
-                color: GOLD_ON_DARK,
+                color: GOLD,
                 marginBottom: '1.5rem',
               }}
             >
