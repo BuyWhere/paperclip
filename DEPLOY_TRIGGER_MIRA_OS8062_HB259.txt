@@ -1,0 +1,1 @@
+Force Vercel redeploy: 2026-09-25T0300Z OS-8062 archetype override
