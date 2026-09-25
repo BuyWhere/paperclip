@@ -102,6 +102,7 @@
       "destination": "https://orchestrator-production-1643.up.railway.app/health"
     }
   ],
-  "_mira_hb20260924_os8062": "force-redeploy \u2014 reveal API archetype param fix",
-  "_archie_force": "redeploy-1742Z"
+  "_mira_hb20260924_os8062": "force-redeploy — reveal API archetype param fix",
+  "_archie_force": "redeploy-1742Z",
+  "_mira_hb_202609251140z": "force-redeploy OS-8062 archetype override fix"
 }
