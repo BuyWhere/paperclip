@@ -37,6 +37,13 @@ function classify(
   payload?: unknown,
   requestEmail?: string | null
 ): { message: string; severity: Severity; kind: AuthBridgeKind } {
+  if (status === 405) {
+    return {
+      message: 'Sign-up is temporarily unavailable. Please try again in a moment.',
+      severity: 'error',
+      kind: 'generic',
+    }
+  }
   if (status === 422) {
     const classified = classifySignup422(payload, requestEmail)
     return { ...classified, severity: 'warning' }
@@ -170,6 +177,7 @@ export const SignupClerkErrorBridge: FC<SignupClerkErrorBridgeProps> = ({
               status: response.status,
               endpoint: url,
               severity,
+              isMethodNotAllowed: response.status === 405, // OS-8094: flag 405 for alerting
             })
           }
         } catch {
