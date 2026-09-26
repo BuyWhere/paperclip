@@ -64,10 +64,10 @@ export default function SignupPage() {
           in the middle of the 1360px (and 1440px viewport) shell instead of hugging
           the left edge and leaving ~600px of dead cream on the right. max-w-7xl
           equivalent is 1280px; we keep 1360 to match the marketing header. */}
-      {/* OS-7806: items-center + min-h-[calc(100vh-5rem)] so the shorter hero
-          copy and taller Clerk card share a vertical midpoint instead of
-          flex-start pinning the card to y~176 while copy starts at y~345. */}
-      <div className="signup-grid" style={{ maxWidth: "80rem", width: "100%", boxSizing: "border-box", margin: "0 auto", minHeight: "calc(100vh - 5rem)", display: "grid", gridTemplateColumns: "minmax(0, 460px) minmax(0, 520px)", justifyContent: "center", justifyItems: "stretch", alignItems: "center", gap: "3rem", padding: "1.5rem 1.5rem 2rem" }}>
+      {/* OS-8168: items-start + pt-12 so the hero copy and Clerk form card
+          share the same top baseline instead of the form floating ~177px above
+          the hero (form y≈153, hero y≈330 at 1440px). */}
+      <div className="signup-grid" style={{ maxWidth: "80rem", width: "100%", boxSizing: "border-box", margin: "0 auto", minHeight: "calc(100vh - 5rem)", display: "grid", gridTemplateColumns: "minmax(0, 460px) minmax(0, 520px)", justifyContent: "center", justifyItems: "stretch", alignItems: "flex-start", gap: "3rem", padding: "3rem 1.5rem 2rem" }}>
         {/* Left, product context. The 8os wordmark lives in the global Header, so
             we don't repeat it here — it would compete with the header and split
             attention across two brand marks on the same page. */}
@@ -292,8 +292,8 @@ export default function SignupPage() {
            in case the appearance.elements.cardBox override misses the cascade. */
         .signup-auth .cl-cardBox { box-shadow: none !important; border: none !important; }
         .signup-auth .cl-card { box-shadow: none !important; border: none !important; background: transparent !important; }
-        /* OS-7126: belt-and-suspenders if Clerk/SSR drops the inline justify. */
-        .signup-grid { justify-content: center; align-items: center; margin-left: auto; margin-right: auto; width: 100%; max-width: 80rem; }
+        /* OS-8168: align-items:flex-start aligns both columns at the top baseline. */
+        .signup-grid { justify-content: center; align-items: flex-start; margin-left: auto; margin-right: auto; width: 100%; max-width: 80rem; }
         .signup-auth .cl-card,
         .signup-auth .cl-cardBox { overflow: hidden !important; border-radius: 0 !important; border-bottom-left-radius: 0 !important; border-bottom-right-radius: 0 !important; }
         @media (max-width: 860px) {
