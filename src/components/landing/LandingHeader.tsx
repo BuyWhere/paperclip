@@ -121,6 +121,7 @@ export default function LandingHeader() {
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
           style={{
+            display: 'none',
             background: 'transparent',
             border: `1px solid ${HAIRLINE}`,
             borderRadius: '9px',

@@ -1,0 +1,1 @@
+vex hb 2026-09-26T0126Z: vercel.json self-route fix, OS-7947 blocks GitHub sync

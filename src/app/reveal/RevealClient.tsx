@@ -103,7 +103,7 @@ export default function RevealClient() {
             background: 'var(--color-bg-card)',
             border: '1px solid var(--color-border)',
             borderRadius: '18px',
-            padding: '2rem',
+            padding: '1.5rem',
             boxShadow: 'var(--color-shadow)',
           }}
         >
@@ -128,7 +128,7 @@ export default function RevealClient() {
               border: '1px solid var(--color-border-strong)',
               borderRadius: '10px',
               color: 'var(--color-text-primary)',
-              marginBottom: '1.25rem',
+              marginBottom: '1rem',
             }}
           />
 
@@ -149,7 +149,7 @@ export default function RevealClient() {
               border: '1px solid var(--color-border-strong)',
               borderRadius: '10px',
               color: 'var(--color-text-primary)',
-              marginBottom: '1.25rem',
+              marginBottom: '1rem',
             }}
           />
 
@@ -176,7 +176,7 @@ export default function RevealClient() {
               marginBottom: '0.5rem',
             }}
           />
-          <p id="birth-location-help" style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', lineHeight: 1.5, margin: '0 0 1.5rem' }}>
+          <p id="birth-location-help" style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', lineHeight: 1.5, margin: '0 0 1rem' }}>
             8os uses BaZi four pillars from the solar calendar date. Location is not required for year/month/day pillars. If you add a birth time, enter it as local clock time at the birthplace — we do not convert Western longitude or DST here.
           </p>
 
@@ -219,7 +219,7 @@ export default function RevealClient() {
               borderRadius: '18px',
               padding: '2.25rem',
               textAlign: 'center',
-              marginBottom: '1.25rem',
+              marginBottom: '1rem',
               boxShadow: 'var(--color-shadow)',
             }}
           >
@@ -246,7 +246,7 @@ export default function RevealClient() {
                 border: '1px solid var(--color-border)',
                 borderRadius: '14px',
                 padding: '1.35rem 1.5rem',
-                marginBottom: '1.25rem',
+                marginBottom: '1rem',
                 textAlign: 'left',
               }}
             >

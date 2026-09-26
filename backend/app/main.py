@@ -777,8 +777,13 @@ async def reveal_archetype(
         personality_code='sg',
     )
 
+    # OS-8062: If user provides archetype, use it directly to override computed name
+    archetype_name = result.archetype_name
+    if payload.archetype:
+        archetype_name = payload.archetype
+
     return {
-        "archetypeName": result.archetype_name,
+        "archetypeName": archetype_name,
         "description": result.description,
         "element": result.day_element,
         "elementLabel": ELEMENT_LABEL.get(result.day_element, result.day_element),
