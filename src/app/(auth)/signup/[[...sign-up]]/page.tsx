@@ -71,7 +71,7 @@ export default function SignupPage() {
         {/* Left, product context. The 8os wordmark lives in the global Header, so
             we don't repeat it here — it would compete with the header and split
             attention across two brand marks on the same page. */}
-        <section className="signup-pitch" style={{ maxWidth: 460, paddingTop: "1.5rem" }}>
+        <section className="signup-pitch" style={{ maxWidth: 460, paddingTop: "5.5rem" }}>
           <h1 style={{ fontFamily: "var(--font-serif-header), Georgia, serif", fontSize: "2rem", lineHeight: 1.15, fontWeight: 600, margin: "0 0 0.75rem" }}>
             Build your personalized Life OS
           </h1>
