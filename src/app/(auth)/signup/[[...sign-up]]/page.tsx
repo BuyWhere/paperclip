@@ -35,7 +35,7 @@ export default function SignupPage() {
           here as well ensures the class is present even if the SSR HTML is
           cached without the layout-level script's effect (e.g., Vercel edge
           caching). */}
-      <script dangerouslySetInnerHTML={{ __html: `document.body.classList.add('signup-auth');` }} />
+      <script dangerouslySetInnerHTML={{ __html: `if(document.body){document.body.classList.add('signup-auth');}` }} />
       {/* OS-7126: main itself is a block-level 100% width wrapper so mx-auto on
           the inner grid actually centers against the 1440px viewport instead of
           a shrink-to-content parent. */}

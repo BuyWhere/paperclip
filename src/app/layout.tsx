@@ -123,7 +123,7 @@ export default function RootLayout({
         {/* OS-8171: moved from <head> to <body> — ensures document.body exists */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){var p=window.location.pathname;if(p==='/login'||p==='/sign-in'||p==='/signin'){document.body.classList.add('login-auth');}if(p==='/signup'||p==='/sign-up'||p==='/signout'){document.body.classList.add('signup-auth');}})();`,
+            __html: `(function(){var p=window.location.pathname;if(document.body){if(p==='/login'||p==='/sign-in'||p==='/signin'){document.body.classList.add('login-auth');}if(p==='/signup'||p==='/sign-up'||p==='/signout'){document.body.classList.add('signup-auth');}}})();`,
           }}
         />
         <ClerkProvider
