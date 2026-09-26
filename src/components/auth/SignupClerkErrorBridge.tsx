@@ -514,8 +514,7 @@ export const SignupClerkErrorBridge: FC<SignupClerkErrorBridgeProps> = ({
         </div>
       )}
       <SignUp
-        routing="path"
-        path="/signup"
+        routing="hash"
         signInUrl={signInUrl ?? '/login'}
         fallbackRedirectUrl={fallbackRedirectUrl ?? '/onboarding'}
         appearance={appearance}
