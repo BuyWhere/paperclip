@@ -219,6 +219,10 @@ export default function LandingHeader() {
       <style
         dangerouslySetInnerHTML={{
           __html: `
+          /* Hide hamburger by default on desktop */
+          .lh-hamburger { display: none !important; }
+          /* Hide hamburger by default on desktop */
+          .lh-hamburger { display: none !important; }
           @media (max-width: 768px) {
             .lh-desktop-nav { display: none !important; }
             .lh-desktop-auth { display: none !important; }
