@@ -117,7 +117,7 @@ export default function SignupPage() {
               </label>
               <input
                 id="email"
-                name="email"
+                name="prefillEmail"
                 type="email"
                 autoComplete="email"
                 inputMode="email"
@@ -270,7 +270,8 @@ export default function SignupPage() {
            class hashing. */
         .signup-auth:has(input.cl-formFieldInput) .signup-ssr-email,
         .signup-auth:has(input[name="emailAddress"]) .signup-ssr-email,
-        .signup-auth:has(input[name="identifier"]) .signup-ssr-email {
+        .signup-auth:has(input[name="identifier"]) .signup-ssr-email,
+        .signup-auth:has(input[name="prefillEmail"]) .signup-ssr-email {
           position: absolute !important;
           width: 1px !important;
           height: 1px !important;
