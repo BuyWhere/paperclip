@@ -112,18 +112,18 @@ export default function SignupPage() {
                 paint, so VidMee looking for input[type=email] misses the field.
                 Hide this fallback once Clerk's own input is in the tree. */}
             <div className="signup-ssr-email" data-testid="signup-ssr-email">
-              <label htmlFor="email" style={{ display: "block", color: LINK_DARK, fontSize: 13, fontWeight: 600, margin: "24px 24px 8px" }}>
+              <label htmlFor="signup-prefill-email" style={{ display: "block", color: LINK_DARK, fontSize: 13, fontWeight: 600, margin: "24px 24px 8px" }}>
                 Email address
               </label>
               <input
-                id="email"
+                id="signup-prefill-email"
                 name="prefillEmail"
                 type="email"
                 autoComplete="email"
                 inputMode="email"
                 placeholder="Enter your email address"
                 aria-label="Email address"
-                data-testid="signup-email-input"
+                data-testid="signup-ssr-email-input"
                 style={{
                   display: "block",
                   width: "calc(100% - 48px)",

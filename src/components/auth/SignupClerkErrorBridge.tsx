@@ -545,7 +545,7 @@ function SignupEmailSkeleton() {
       const clerk = clerkEmail()
       if (!clerk) return false
       const skeleton = root.querySelector<HTMLInputElement>(
-        'input[data-testid="signup-email-input"]'
+        '#signup-clerk-email'
       )
       if (skeleton?.value && !clerk.value) {
         clerk.value = skeleton.value
@@ -593,7 +593,7 @@ function SignupEmailSkeleton() {
       }}
     >
       <label
-        htmlFor="email"
+        htmlFor="signup-clerk-email"
         style={{
           display: 'block',
           color: '#000000',
@@ -605,8 +605,8 @@ function SignupEmailSkeleton() {
         Email address
       </label>
       <input
-        id="email"
-        name="email"
+        id="signup-clerk-email"
+        name="signup-clerk-email"
         type="email"
         autoComplete="email"
         inputMode="email"
