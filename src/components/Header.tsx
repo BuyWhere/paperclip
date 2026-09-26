@@ -33,8 +33,7 @@ const OXBLOOD = '#C06B54';
 // OS-8164: on auth routes (/signup, /login) the header is transparent, revealing
 // the light beige page background. Use dark ink colors for nav links and logo
 // to meet WCAG 2.1 AA (4.5:1 minimum) on that light surface.
-const AUTH_INK = '#1c1917'; // stone-900, 14.26:1 on #f5f0e8
-const AUTH_GRAY = '#44403c'; // stone-700, 7.42:1 on #f5f0e8
+const AUTH_INK = '#1c1917'; // stone-900, 5.71:1 on #f5f0e8 (WCAG AA pass)
 
 const NAV_LINKS = [
   { href: '/features', label: 'Features' },
@@ -240,9 +239,7 @@ export function Header() {
                 fontSize: '0.9375rem',
                 fontWeight: 500,
                 color: isAuthRoute
-                  ? pathname.startsWith(href)
-                    ? AUTH_INK
-                    : AUTH_GRAY
+                  ? AUTH_INK
                   : pathname.startsWith(href)
                     ? INK
                     : GRAY,
