@@ -114,7 +114,7 @@ export default function LandingHeader() {
           </a>
         </div>
 
-        {/* Hamburger */}
+        {/* Hamburger — hidden on desktop, shown on mobile (< 768px) */}
         <button
           className="lh-hamburger"
           aria-label={open ? 'Close menu' : 'Open menu'}
@@ -219,11 +219,12 @@ export default function LandingHeader() {
       <style
         dangerouslySetInnerHTML={{
           __html: `
-          /* Hide hamburger by default on desktop */
+          /* Default: hide hamburger on desktop. !important ensures inline display:none wins. */
           .lh-hamburger { display: none !important; }
           @media (max-width: 768px) {
             .lh-desktop-nav { display: none !important; }
             .lh-desktop-auth { display: none !important; }
+            /* Override inline display:none on mobile — also !important so it's symmetric */
             .lh-hamburger { display: flex !important; }
           }
           @media (max-width: 400px) {
