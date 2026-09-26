@@ -50,8 +50,6 @@ const SURFACE = 'var(--color-bg-card)'
 const GOLD = 'var(--color-accent)'
 /** OS-7128: eyebrow tags on dark charcoal. #E5C396 on #221F1A = 9.20:1 (AA/AAA). */
 const GOLD_ON_DARK = '#E5C396'
-/** OS-7624: eyebrow tags on cream. #B8862F on #F7F3EC = 5.94:1 (AAA). */
-const GOLD_ON_CREAM = '#B8862F'
 const HAIRLINE = 'var(--color-border)'
 const OXBLOOD = 'var(--color-accent-2)'
 const MAXW = 1360
@@ -201,7 +199,6 @@ export default function Home() {
                 fontWeight: 600,
                 letterSpacing: '0.14em',
                 textTransform: 'uppercase',
-                color: GOLD_ON_CREAM,
                 marginBottom: '1.5rem',
               }}
             >
@@ -318,7 +315,6 @@ export default function Home() {
                 style={{
                   fontFamily: serif,
                   fontSize: '1.5rem',
-                  color: GOLD,
                   marginBottom: '1rem',
                 }}
               >
@@ -476,7 +472,6 @@ export default function Home() {
               fontWeight: 600,
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
-              color: GOLD_ON_CREAM,
               marginBottom: '1rem',
             }}
           >
@@ -569,7 +564,6 @@ function SectionHead({
           fontWeight: 600,
           letterSpacing: '0.14em',
           textTransform: 'uppercase',
-          color: GOLD_ON_CREAM,
           marginBottom: '0.9rem',
         }}
       >
