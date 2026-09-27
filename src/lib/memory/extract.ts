@@ -371,7 +371,12 @@ async function distill(sourceText: string): Promise<{
       attempts = 2
       // Prefer the pass that actually produced candidates.
       if (r2.memory.length > 0 || r2.commitments.length > 0) r = r2
-      else if (r2.parsed && !r.parsed) r = r2 // at least a clean empty over a parse failure
+      // Always prefer the strict pass when it parses cleanly — even an empty-but-valid
+      // strict parse is better than a potentially malformed standard pass.  OS-2808
+      // also observed that gpt-4o-mini sometimes routes to MiniMax which truncates;
+      // preferring r2's output reduces the window for a partial-JSON artefact to
+      // survive into the coercion step.
+      else if (r2.parsed) r = r2
     }
 
     return { memory: r.memory, commitments: r.commitments, usedLlm: true, parsed: r.parsed, attempts }
@@ -404,21 +409,30 @@ export async function consolidateUser(userId: string, opts: { at?: Date } = {}):
       // PostHog error-tracking so these are visible, not silent, with enough
       // context (userId, input size, whether the reply parsed) to triage.
       if (text.trim().length > 200) {
-        void captureServerException(
-          new Error('memory consolidation yielded 0 candidates on non-trivial input'),
-          {
-            route: 'memory/extract:consolidateUser',
-            userId,
-            extra: {
-              inputLength: text.length,
-              journalCount: journals.length,
-              messageCount: messages.length,
-              usedLlm,
-              parsed,
-              attempts,
+        // `void` does not suppress synchronous exceptions that fire before the
+        // first `await` inside `captureServerException`.  Wrap to guarantee the
+        // PostHog fire-and-forget call can never propagate a throw into
+        // `consolidateUser`'s caller.
+        try {
+          captureServerException(
+            new Error('memory consolidation yielded 0 candidates on non-trivial input'),
+            {
+              route: 'memory/extract:consolidateUser',
+              userId,
+              extra: {
+                inputLength: text.length,
+                journalCount: journals.length,
+                messageCount: messages.length,
+                usedLlm,
+                parsed,
+                attempts,
+              },
             },
-          },
-        )
+          ).catch(() => {}) // swallow if PostHog call rejects
+        } catch (_) {
+          // swallow any sync errors from env access / JSON.stringify before the
+          // first `await` inside `captureServerException`.
+        }
       }
       return { ...empty, usedLlm, reason: parsed ? 'no candidates' : 'unparseable llm reply' }
     }
