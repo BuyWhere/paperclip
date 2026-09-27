@@ -96,6 +96,8 @@ export async function POST(req: NextRequest) {
     // we anchor to a stable default code — the birth date/time still fully
     // drives the sun sign, Day Master, strength and element, so different dates
     // yield different archetypes. (The full quiz refines this after signup.)
+    // OS-8062: If user provides archetype, use it directly (bypass birthDate computation)
+    const userArchetype = body.archetype?.trim()
     const result = generateArchetype({
       birthDate,
       birthTime,

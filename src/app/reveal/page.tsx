@@ -54,7 +54,7 @@ export default function RevealPage() {
         flexDirection: 'column',
         alignItems: 'center',
         minHeight: '100vh',
-        padding: '3.5rem 1.5rem 4rem',
+        padding: '3.5rem 1.5rem 2rem',
         background:
           'radial-gradient(1100px 480px at 50% -8%, #FFE9CE 0%, rgba(255,233,206,0) 60%), var(--color-bg-primary)',
         color: 'var(--color-text-primary)',

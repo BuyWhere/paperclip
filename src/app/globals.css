@@ -734,7 +734,7 @@ body:has(.app-sidebar) main:not(.cal-main) {
   color: #221F1A !important;
 }
 [data-theme='dark'] .landing-gold {
-  color: #E5C396 !important;
+  color: var(--color-accent) !important;
 }
 [data-theme='dark'] .landing-gold-fill,
 [data-theme='dark'] .cta-primary {

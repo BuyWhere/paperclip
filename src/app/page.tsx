@@ -320,7 +320,6 @@ export default function Home() {
                 style={{
                   fontFamily: serif,
                   fontSize: '1.5rem',
-                  color: GOLD,
                   marginBottom: '1rem',
                 }}
               >
@@ -478,7 +477,6 @@ export default function Home() {
               fontWeight: 600,
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
-              color: GOLD_ON_CREAM,
               marginBottom: '1rem',
             }}
           >
@@ -571,7 +569,6 @@ function SectionHead({
           fontWeight: 600,
           letterSpacing: '0.14em',
           textTransform: 'uppercase',
-          color: GOLD_ON_CREAM,
           marginBottom: '0.9rem',
         }}
       >

@@ -37,6 +37,13 @@ function classify(
   payload?: unknown,
   requestEmail?: string | null
 ): { message: string; severity: Severity; kind: AuthBridgeKind } {
+  if (status === 405) {
+    return {
+      message: 'Sign-up is temporarily unavailable. Please try again in a moment.',
+      severity: 'error',
+      kind: 'generic',
+    }
+  }
   if (status === 422) {
     const classified = classifySignup422(payload, requestEmail)
     return { ...classified, severity: 'warning' }
@@ -170,6 +177,7 @@ export const SignupClerkErrorBridge: FC<SignupClerkErrorBridgeProps> = ({
               status: response.status,
               endpoint: url,
               severity,
+              isMethodNotAllowed: response.status === 405, // OS-8094: flag 405 for alerting
             })
           }
         } catch {
@@ -514,8 +522,7 @@ export const SignupClerkErrorBridge: FC<SignupClerkErrorBridgeProps> = ({
         </div>
       )}
       <SignUp
-        routing="path"
-        path="/signup"
+        routing="hash"
         signInUrl={signInUrl ?? '/login'}
         fallbackRedirectUrl={fallbackRedirectUrl ?? '/onboarding'}
         appearance={appearance}
@@ -538,7 +545,7 @@ function SignupEmailSkeleton() {
       const clerk = clerkEmail()
       if (!clerk) return false
       const skeleton = root.querySelector<HTMLInputElement>(
-        'input[data-testid="signup-email-input"]'
+        '#signup-clerk-email'
       )
       if (skeleton?.value && !clerk.value) {
         clerk.value = skeleton.value
@@ -586,7 +593,7 @@ function SignupEmailSkeleton() {
       }}
     >
       <label
-        htmlFor="email"
+        htmlFor="signup-clerk-email"
         style={{
           display: 'block',
           color: '#000000',
@@ -598,8 +605,8 @@ function SignupEmailSkeleton() {
         Email address
       </label>
       <input
-        id="email"
-        name="email"
+        id="signup-clerk-email"
+        name="signup-clerk-email"
         type="email"
         autoComplete="email"
         inputMode="email"
