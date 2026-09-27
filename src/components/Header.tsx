@@ -283,7 +283,7 @@ export function Header() {
               clusters with Log in on the right edge. */}
           {(pathname.startsWith('/archetypes/') || pathname === '/features' || pathname === '/about') && (
             <Link
-              href="/onboarding"
+              href="/signup"
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -375,10 +375,10 @@ export function Header() {
             })}
           </nav>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1.25rem' }}>
-            {/* Mobile "Get Started" CTA - shown on archetype pages and /features */}
-            {(pathname.startsWith('/archetypes/') || pathname === '/features') && (
+            {/* Mobile "Get Started" CTA - shown on archetype pages, /features, and /about */}
+            {(pathname.startsWith('/archetypes/') || pathname === '/features' || pathname === '/about') && (
               <Link
-                href="/onboarding"
+                href="/signup"
                 onClick={() => setMobileMenuOpen(false)}
                 style={{
                   textAlign: 'center',
@@ -448,8 +448,8 @@ export function Header() {
           header.marketing-header a[href="/dashboard"]:focus-visible {
             color: var(--color-accent-hover) !important;
           }
-          header.marketing-header a[href="/onboarding"]:hover,
-          header.marketing-header a[href="/onboarding"]:focus-visible {
+          header.marketing-header a[href="/signup"]:hover,
+          header.marketing-header a[href="/signup"]:focus-visible {
             background: var(--color-accent-hover) !important;
           }
         `,
