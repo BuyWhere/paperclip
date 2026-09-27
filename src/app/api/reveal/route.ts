@@ -66,6 +66,23 @@ export async function POST(req: NextRequest) {
   // Accept `date` as an alias — some clients / probes send YYYY-MM-DD under
   // that key. Canonical field remains birthDate.
   const rawDate = body.birthDate || (typeof (body as { date?: unknown }).date === 'string' ? (body as { date?: string }).date : undefined)
+  const userArchetypeEarly = body.archetype?.trim()
+  // OS-8221 / OS-8062: archetype-only taste (no birthDate). Return the named
+  // override without running BaZi. Combined archetype+birthDate still computes
+  // pillars then overrides the display name.
+  if (!rawDate && userArchetypeEarly) {
+    return NextResponse.json({
+      archetypeName: userArchetypeEarly,
+      description: `${userArchetypeEarly} — a named taste of your 8os path.`,
+      element: null,
+      elementLabel: null,
+      dayMasterEn: null,
+      sunSignName: null,
+      strength: null,
+      phaseLabel: null,
+      phaseTeaser: null,
+    })
+  }
   const parsed = parseBirthDate(rawDate)
   if (!parsed.ok) {
     return NextResponse.json({ error: 'Please enter a valid birth date (YYYY-MM-DD).' }, { status: 400 })
