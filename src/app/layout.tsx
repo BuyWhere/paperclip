@@ -111,21 +111,21 @@ export default function RootLayout({
             persisted choice + OS preference, BEFORE first paint. Must run
             before any styled content renders. See src/lib/theme.ts. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
-        {/* OS-6399: add auth-page body class BEFORE React hydrates so the
-            marketing header override (body.login-auth header.marketing-header)
-            applies on first paint. Synchronous (not async/defer) so it runs
-            before the browser paints. */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){var p=window.location.pathname;if(p==='/login'||p==='/sign-in'||p==='/signin'){document.body.classList.add('login-auth');}if(p==='/signup'||p==='/sign-up'||p==='/signout'){document.body.classList.add('signup-auth');}})();`,
-          }}
-        />
+        {/* OS-8171: auth-page class script moved to <body> — was causing
+            "Cannot read properties of null (reading 'classList')" because
+            document.body is null when <head> scripts execute. */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareSchema) }}
         />
       </head>
       <body suppressHydrationWarning>
+        {/* OS-8171: moved from <head> to <body> — ensures document.body exists */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var p=window.location.pathname;if(p==='/login'||p==='/sign-in'||p==='/signin'){document.body.classList.add('login-auth');}if(p==='/signup'||p==='/sign-up'||p==='/signout'){document.body.classList.add('signup-auth');}})();`,
+          }}
+        />
         <ClerkProvider
           signInUrl={process.env.NEXT_PUBLIC_CLERK_SIGN_IN_URL ?? '/login'}
           signUpUrl={process.env.NEXT_PUBLIC_CLERK_SIGN_UP_URL ?? '/signup'}
