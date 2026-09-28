@@ -131,24 +131,31 @@ async function gatherWindow(userId: string, now: Date) {
   return { journals, messages }
 }
 
-/** Build the source-text block the LLM distills (with source pointers). */
-function renderSources(
+/** Build the source-text block the LLM distills (with source pointers).
+ *  `userTextLength` counts only user-authored text (journals + user chat).
+ *  Assistant-only windows are long but not extractable — OS-7620: do not
+ *  treat them as "non-trivial misses" for PostHog exception tracking.
+ */
+export function renderSources(
   journals: Array<{ id: string; content: string; kind: string; mood: string | null }>,
   messages: Array<{ id: string; role: string; content: string | null }>,
-): { text: string; hasContent: boolean } {
+): { text: string; hasContent: boolean; userTextLength: number } {
   const L: string[] = []
+  let userTextLength = 0
   for (const j of journals) {
     const c = (j.content ?? '').trim()
     if (!c) continue
     const sk = j.kind === 'free' ? 'journal' : 'reflection'
     L.push(`[${sk}#${j.id}${j.mood ? ` mood=${j.mood}` : ''}] ${c}`)
+    userTextLength += c.length
   }
   for (const m of messages) {
     const c = (m.content ?? '').trim()
     if (!c) continue
     L.push(`[chat#${m.id} ${m.role}] ${c}`)
+    if (m.role === 'user') userTextLength += c.length
   }
-  return { text: L.join('\n'), hasContent: L.length > 0 }
+  return { text: L.join('\n'), hasContent: L.length > 0, userTextLength }
 }
 
 const SYSTEM = [
@@ -399,20 +406,16 @@ export async function consolidateUser(userId: string, opts: { at?: Date } = {}):
 
   try {
     const { journals, messages } = await gatherWindow(userId, now)
-    const { text, hasContent } = renderSources(journals, messages)
+    const { text, hasContent, userTextLength } = renderSources(journals, messages)
     if (!hasContent) return { ...empty, reason: 'no source in window' }
 
     const { memory, commitments, usedLlm, parsed, attempts } = await distill(text)
     if (memory.length === 0 && commitments.length === 0) {
-      // OS-2808 observability: a non-trivial window that STILL distills to zero
-      // is a real miss (parse failure or a stubborn empty). Surface it in
-      // PostHog error-tracking so these are visible, not silent, with enough
-      // context (userId, input size, whether the reply parsed) to triage.
-      if (text.trim().length > 200) {
-        // `void` does not suppress synchronous exceptions that fire before the
-        // first `await` inside `captureServerException`.  Wrap to guarantee the
-        // PostHog fire-and-forget call can never propagate a throw into
-        // `consolidateUser`'s caller.
+      // OS-7620: only fire PostHog for genuine parse failures on USER-authored
+      // non-trivial windows. Parsed-empty (LLM correctly found nothing) and
+      // assistant-only windows are expected, not exceptions.
+      const userNonTrivial = userTextLength > 200
+      if (userNonTrivial && !parsed) {
         try {
           captureServerException(
             new Error('memory consolidation yielded 0 candidates on non-trivial input'),
@@ -421,6 +424,7 @@ export async function consolidateUser(userId: string, opts: { at?: Date } = {}):
               userId,
               extra: {
                 inputLength: text.length,
+                userTextLength,
                 journalCount: journals.length,
                 messageCount: messages.length,
                 usedLlm,
@@ -428,10 +432,9 @@ export async function consolidateUser(userId: string, opts: { at?: Date } = {}):
                 attempts,
               },
             },
-          ).catch(() => {}) // swallow if PostHog call rejects
+          ).catch(() => {})
         } catch (_) {
-          // swallow any sync errors from env access / JSON.stringify before the
-          // first `await` inside `captureServerException`.
+          // swallow sync errors from env access / JSON.stringify
         }
       }
       return { ...empty, usedLlm, reason: parsed ? 'no candidates' : 'unparseable llm reply' }
