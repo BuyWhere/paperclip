@@ -291,27 +291,19 @@ export function ContactForm() {
       <button
         type="submit"
         disabled={status === 'submitting'}
-        onFocus={e => { if (status !== 'submitting') e.currentTarget.style.boxShadow = '0 0 0 3px color-mix(in srgb, var(--color-accent) 40%, transparent)'; }}
-        onBlur={e => { e.currentTarget.style.boxShadow = 'none'; }}
-        onMouseEnter={e => { if (status !== 'submitting') e.currentTarget.style.filter = 'brightness(1.1)'; }}
-        onMouseLeave={e => { e.currentTarget.style.filter = 'none'; }}
         style={{
-          // Background + text colors are owned by the !important CSS rules
-          // in globals.css on .contact-form button[type='submit']. The inline
-          // gradient was ink-on-light-gold which failed AA on the dark half
-          // (3.74:1). The CSS now paints a darker-gold gradient with white
-          // text — 6.35:1+ at every pixel in both themes. OS-3982 round 2.
+          width: '100%',
           background: status === 'submitting' ? 'var(--color-border)' : 'var(--color-accent)',
           color: '#FFFFFF',
-          border: 'none',
-          padding: '0.75rem 1.5rem',
+          border: '2px solid var(--color-accent)',
           borderRadius: '8px',
+          padding: '0.75rem 1.5rem',
           fontSize: '1rem',
           fontWeight: 600,
           cursor: status === 'submitting' ? 'wait' : 'pointer',
           opacity: status === 'submitting' ? 0.7 : 1,
           fontFamily: 'inherit',
-          transition: 'filter 0.15s ease',
+          transition: 'filter 0.15s ease, border-color 0.15s ease',
         }}
       >
         {status === 'submitting' ? 'Sending…' : 'Send message'}

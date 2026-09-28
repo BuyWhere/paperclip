@@ -177,9 +177,11 @@ app.add_middleware(SlowAPIMiddleware)
 
 # Registered feature routers (OS-5119: alignment routes were defined but never mounted)
 from app.routers.alignment import router as alignment_router  # noqa: E402
+from app.routers.product_surface import router as product_surface_router  # noqa: E402
 from app.routers.telegram import router as telegram_router  # noqa: E402
 
 app.include_router(alignment_router)
+app.include_router(product_surface_router)
 app.include_router(telegram_router)
 
 
@@ -768,6 +770,23 @@ async def reveal_archetype(
     if birth_time and not re.match(r'^\d{2}:\d{2}$', birth_time):
         birth_time = None
 
+    # If user provides archetype, look it up and use those details
+    user_archetype = payload.archetype.strip() if payload.archetype else None
+    if user_archetype:
+        # Try to look up the archetype by ID
+        lookup_result = _lookup_archetype(user_archetype)
+        if lookup_result:
+            return {
+                "archetypeName": lookup_result['name'],
+                "description": lookup_result['description'],
+                "element": lookup_result['day_element'],
+                "elementLabel": ELEMENT_LABEL.get(lookup_result['day_element'], lookup_result['day_element']),
+                "dayMasterEn": lookup_result['day_master_romanized'].capitalize(),
+                "sunSignName": lookup_result['sun_sign'].capitalize(),
+                "strength": lookup_result['strength'],
+            }
+        # If lookup fails, fall back to computed archetype
+
     # Use the archetype engine with personality code 'sg' (no quiz in reveal flow)
     result = _generate_archetype(
         birth_date=payload.birthDate,
@@ -775,8 +794,12 @@ async def reveal_archetype(
         personality_code='sg',
     )
 
+    # Prefer user-provided archetype if supplied; fall back to computed archetype
+    user_archetype = payload.archetype.strip() if payload.archetype else None
+    display_archetype = user_archetype if user_archetype else result.archetype_name
+
     return {
-        "archetypeName": result.archetype_name,
+        "archetypeName": display_archetype,
         "description": result.description,
         "element": result.day_element,
         "elementLabel": ELEMENT_LABEL.get(result.day_element, result.day_element),

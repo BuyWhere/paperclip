@@ -1,0 +1,1 @@
+Mira HB 2026-09-24T23:30Z force Vercel redeploy — OS-8062 archetype fix in 50d41a9f, live bundle still pre-fix. Source verified correct. Refresh RAILWAY_TOKEN (OS-8066) to unblock.

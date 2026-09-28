@@ -66,28 +66,25 @@ export async function POST(req: NextRequest) {
   // Accept `date` as an alias — some clients / probes send YYYY-MM-DD under
   // that key. Canonical field remains birthDate.
   const rawDate = body.birthDate || (typeof (body as { date?: unknown }).date === 'string' ? (body as { date?: string }).date : undefined)
-  const userArchetypeEarly = body.archetype?.trim()
-  // OS-8221 / OS-8062: archetype-only taste (no birthDate). Return the named
-  // override without running BaZi. Combined archetype+birthDate still computes
-  // pillars then overrides the display name.
-  if (!rawDate && userArchetypeEarly) {
-    return NextResponse.json({
-      archetypeName: userArchetypeEarly,
-      description: `${userArchetypeEarly} — a named taste of your 8os path.`,
-      element: null,
-      elementLabel: null,
-      dayMasterEn: null,
-      sunSignName: null,
-      strength: null,
-      phaseLabel: null,
-      phaseTeaser: null,
-    })
+
+  // OS-8062: archetype-only mode — user selected their archetype without providing
+  // a birth date. birthDate is only required when archetype is NOT provided.
+  let birthDate: string
+  let dateParsed = parseBirthDate(rawDate)
+  if (!dateParsed.ok) {
+    if (body.archetype) {
+      // archetype-only mode: use a safe default date that won't crash BaZi. The
+      // archetypeOverride path in generateArchetype returns correct name/desc
+      // regardless of the date used for pillar math.
+      const safeDate = '1990-01-01'
+      birthDate = safeDate
+      dateParsed = { ok: true, year: 1990, month: 1, day: 1 }
+    } else {
+      return NextResponse.json({ error: 'Please enter a valid birth date (YYYY-MM-DD).' }, { status: 400 })
+    }
+  } else {
+    birthDate = rawDate as string
   }
-  const parsed = parseBirthDate(rawDate)
-  if (!parsed.ok) {
-    return NextResponse.json({ error: 'Please enter a valid birth date (YYYY-MM-DD).' }, { status: 400 })
-  }
-  const birthDate = rawDate as string
   const birthTime = parseBirthTime(body.birthTime)
   // birthLocation is accepted so the public form can collect it, but BaZi
   // year/month/day pillars are solar-calendar (not Western longitude). Hour
@@ -99,6 +96,8 @@ export async function POST(req: NextRequest) {
     // we anchor to a stable default code — the birth date/time still fully
     // drives the sun sign, Day Master, strength and element, so different dates
     // yield different archetypes. (The full quiz refines this after signup.)
+    // OS-8062: If user provides archetype, use it directly (bypass birthDate computation)
+    const userArchetype = body.archetype?.trim()
     const result = generateArchetype({
       birthDate,
       birthTime,
@@ -111,7 +110,9 @@ export async function POST(req: NextRequest) {
     let phaseTeaser: string | null = null
     let phaseLabel: string | null = null
     try {
-      const bazi = calculateBazi(parsed.year, parsed.month, parsed.day, birthTime ? Number(birthTime.split(':')[0]) : undefined)
+      // Extract date parts into local lets so TypeScript's narrowing sticks.
+      const y = dateParsed.year, m = dateParsed.month, d = dateParsed.day
+      const bazi = calculateBazi(y, m, d, birthTime ? Number(birthTime.split(':')[0]) : undefined)
       const strength = calculateDayMasterStrength(bazi).strength
       const phases = computePhases({
         dayElement: bazi.dayElement as Element,
@@ -121,7 +122,7 @@ export async function POST(req: NextRequest) {
         yearStem: bazi.yearPillar.stem,
         dayBranch: bazi.dayPillar.branch,
         gender: 'unspecified',
-        birth: new Date(Date.UTC(parsed.year, parsed.month - 1, parsed.day)),
+        birth: new Date(Date.UTC(y, m - 1, d)),
         now: new Date(),
       })
       const year = phases.layers.find(l => l.key === 'year')

@@ -64,11 +64,14 @@ export default function SignupPage() {
           in the middle of the 1360px (and 1440px viewport) shell instead of hugging
           the left edge and leaving ~600px of dead cream on the right. max-w-7xl
           equivalent is 1280px; we keep 1360 to match the marketing header. */}
-      <div className="signup-grid" style={{ maxWidth: 1360, width: "100%", boxSizing: "border-box", margin: "0 auto", minHeight: "calc(100vh - var(--header-height))", display: "grid", gridTemplateColumns: "minmax(0, 460px) minmax(0, 520px)", justifyContent: "center", justifyItems: "stretch", alignItems: "flex-start", gap: "3rem", padding: "2rem 2rem 2rem" }}>
+      {/* OS-8168: items-start + pt-12 so the hero copy and Clerk form card
+          share the same top baseline instead of the form floating ~177px above
+          the hero (form y≈153, hero y≈330 at 1440px). */}
+      <div className="signup-grid" style={{ maxWidth: "80rem", width: "100%", boxSizing: "border-box", margin: "0 auto", minHeight: "calc(100vh - 5rem)", display: "grid", gridTemplateColumns: "minmax(0, 460px) minmax(0, 520px)", justifyContent: "center", justifyItems: "stretch", alignItems: "flex-start", gap: "3rem", padding: "3rem 1.5rem 2rem" }}>
         {/* Left, product context. The 8os wordmark lives in the global Header, so
             we don't repeat it here — it would compete with the header and split
             attention across two brand marks on the same page. */}
-        <section className="signup-pitch" style={{ maxWidth: 460 }}>
+        <section className="signup-pitch" style={{ maxWidth: 460, paddingTop: "1.5rem" }}>
           <h1 style={{ fontFamily: "var(--font-serif-header), Georgia, serif", fontSize: "2rem", lineHeight: 1.15, fontWeight: 600, margin: "0 0 0.75rem" }}>
             Build your personalized Life OS
           </h1>
@@ -101,9 +104,42 @@ export default function SignupPage() {
             rootBox border is removed so the outer wrapper is the only border,
             preventing the visual disconnect between the Clerk card and the
             Terms/Privacy line. */}
-        <section className="signup-auth" style={{ display: "flex", flexDirection: "column", alignItems: "stretch", alignSelf: "start", width: "100%", maxWidth: "100%", minWidth: 0, boxSizing: "border-box" }}>
+        <section className="signup-auth" style={{ display: "flex", flexDirection: "column", alignItems: "stretch", width: "100%", maxWidth: "100%", minWidth: 0, boxSizing: "border-box" }}>
           <SignupPlanIntent />
-          <div className="signup-auth-card" style={{ width: "100%", maxWidth: "100%", minWidth: 0, boxSizing: "border-box", border: `1px solid ${BORDER}`, borderRadius: "16px", overflow: "hidden", background: CARD, boxShadow: "0 4px 24px rgba(34,31,26,0.06)" }}>
+          <div className="signup-auth-card" style={{ width: "100%", maxWidth: "100%", minWidth: 0, boxSizing: "border-box", border: `1px solid ${BORDER}`, borderRadius: "1.5rem", overflow: "hidden", background: CARD, boxShadow: "0 4px 24px rgba(34,31,26,0.06)" }}>
+            {/* OS-7905: native type=email in the *server* HTML. Client Clerk
+                widgets paint identifier as type=text and hydrate after first
+                paint, so VidMee looking for input[type=email] misses the field.
+                Hide this fallback once Clerk's own input is in the tree. */}
+            <div className="signup-ssr-email" data-testid="signup-ssr-email">
+              <label htmlFor="signup-prefill-email" style={{ display: "block", color: LINK_DARK, fontSize: 13, fontWeight: 600, margin: "24px 24px 8px" }}>
+                Email address
+              </label>
+              <input
+                id="signup-prefill-email"
+                name="prefillEmail"
+                type="email"
+                autoComplete="email"
+                inputMode="email"
+                placeholder="Enter your email address"
+                aria-label="Email address"
+                data-testid="signup-ssr-email-input"
+                style={{
+                  display: "block",
+                  width: "calc(100% - 48px)",
+                  margin: "0 24px 8px",
+                  minHeight: 44,
+                  boxSizing: "border-box",
+                  border: `1px solid ${BORDER}`,
+                  boxShadow: `0 0 0 1px ${BORDER}`,
+                  borderRadius: 12,
+                  padding: "0 12px",
+                  fontSize: 15,
+                  color: INK,
+                  background: CARD,
+                }}
+              />
+            </div>
             <SignupClerkErrorBridge
               signInUrl="/login"
               forceRedirectUrl="/onboarding"
@@ -126,13 +162,13 @@ export default function SignupPage() {
                 },
                 elements: {
                   rootBox: { border: "none", borderRadius: 0, boxShadow: "none", background: "transparent" }, // OS-5940: outer wrapper owns the border so the legal <p> below sits flush inside the card
-                  card: { border: "none", boxShadow: "none", borderRadius: 0, padding: "24px 24px 0" }, // OS-3873 r5: 24px horizontal padding so inputs/social buttons don't clip at card edges
+                  card: { border: "none", boxShadow: "none", borderRadius: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, padding: "24px 24px 0" },
                   // OS-6190: Clerk paints an internal 3-layer shadow + 1px ring on
                   // .cl-cardBox that sits on top of the outer .signup-auth-card and
                   // produces a nested-card artifact (x=848,y=700 on the live build).
                   // Strip shadow + border so the inner Clerk card has no chrome of
                   // its own and the outer wrapper is the only visible card surface.
-                  cardBox: { boxShadow: "none", border: "none", borderRadius: 0, background: "transparent" },
+                  cardBox: { boxShadow: "none", border: "none", borderRadius: 0, overflow: "hidden", background: "transparent" },
                   header: { display: "none" }, // Hide Clerk's default logo/header branding
                   formButtonPrimary: { minHeight: "44px", fontSize: "15px", color: CTA_FG, background: CTA_BG, backgroundColor: CTA_BG },
                   socialButtonsBlockButton: { minHeight: "44px", border: `1px solid ${BORDER}`, borderRadius: "8px", color: SOCIAL_FG, background: SOCIAL_BG, backgroundColor: SOCIAL_BG },
@@ -229,6 +265,22 @@ export default function SignupPage() {
           color: inherit !important;
           background: transparent !important;
         }
+        /* OS-7905: drop the SSR email once Clerk's identifier is mounted so
+           users don't see two email fields. Attribute selector survives Clerk
+           class hashing. */
+        .signup-auth:has(input.cl-formFieldInput) .signup-ssr-email,
+        .signup-auth:has(input[name="emailAddress"]) .signup-ssr-email,
+        .signup-auth:has(input[name="identifier"]) .signup-ssr-email,
+        .signup-auth:has(input[name="prefillEmail"]) .signup-ssr-email {
+          position: absolute !important;
+          width: 1px !important;
+          height: 1px !important;
+          padding: 0 !important;
+          margin: -1px !important;
+          overflow: hidden !important;
+          clip: rect(0 0 0 0) !important;
+          border: 0 !important;
+        }
         .signup-auth, .signup-auth .cl-rootBox, .signup-auth .cl-cardBox, .signup-auth .cl-card {
           max-width: 100% !important;
           width: 100% !important;
@@ -240,12 +292,62 @@ export default function SignupPage() {
            in case the appearance.elements.cardBox override misses the cascade. */
         .signup-auth .cl-cardBox { box-shadow: none !important; border: none !important; }
         .signup-auth .cl-card { box-shadow: none !important; border: none !important; background: transparent !important; }
-        /* OS-7126: belt-and-suspenders if Clerk/SSR drops the inline justify. */
-        .signup-grid { justify-content: center; margin-left: auto; margin-right: auto; width: 100%; max-width: 1360px; }
+        /* OS-8168: align-items:flex-start aligns both columns at the top baseline. */
+        .signup-grid { justify-content: center; align-items: flex-start; margin-left: auto; margin-right: auto; width: 100%; max-width: 80rem; }
+        .signup-auth .cl-card,
+        .signup-auth .cl-cardBox { overflow: hidden !important; border-radius: 0 !important; border-bottom-left-radius: 0 !important; border-bottom-right-radius: 0 !important; }
         @media (max-width: 860px) {
-          .signup-grid { grid-template-columns: minmax(0, 1fr) !important; gap: 1.5rem !important; padding: 2.5rem 1rem 2rem !important; justify-content: stretch !important; }
-          .signup-pitch { max-width: 100% !important; text-align: center; }
-          .signup-pitch ul { text-align: left; max-width: 360px; width: 100%; margin: 0 auto !important; }
+          .signup-grid { grid-template-columns: minmax(0, 1fr) !important; gap: 0.25rem !important; padding: 0.5rem 1rem 1rem !important; justify-content: stretch !important; }
+          .signup-pitch { display: none !important; }
+          .signup-auth { margin-top: 0 !important; }
+          /* OS-7626 r3: hide ALL social/dismiss buttons on mobile via attribute
+             selectors that are resilient to Clerk's varying class-name formats.
+             The r2 class-name selectors failed because Clerk injects additional
+             generated class suffixes (e.g. cl-abc123) that shift the match.
+             Attribute selectors (|= or *=) catch any class containing "social"
+             regardless of suffix ordering. */
+          [class|="cl-socialButtons"],
+          [class*="cl-socialButtons"],
+          [class*="cl_socialButtons"],
+          [class*="socialButtons"],
+          button[data-provider],
+          button[aria-label*="social"],
+          button[aria-label*="Social"],
+          .cl-formButtonPrimary[aria-label*="social"],
+          .cl-formButtonPrimary[aria-label*="Social"] {
+            display: none !important;
+            height: 0 !important;
+            min-height: 0 !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            border: none !important;
+            visibility: hidden !important;
+            overflow: hidden !important;
+          }
+          /* OS-7626 r3: hide ALL dividers via attribute selector */
+          [class|="cl-divider"],
+          [class*="cl-divider"],
+          [class*="cl_divider"],
+          [class*="divider"],
+          hr { display: none !important; }
+          /* OS-7626 r3: tighter form stack so email/password/CTA all clear 844px.
+             Trim gaps, padding, and field margins further than r2. */
+          .signup-auth .cl-card { padding: 10px 10px 0 !important; }
+          .signup-auth .cl-form { gap: 0.25rem !important; }
+          .signup-auth .cl-formField { margin-bottom: 0.2rem !important; }
+          .signup-auth .cl-formFieldInput { min-height: 42px !important; font-size: 15px !important; }
+          .signup-auth .cl-formButtonPrimary {
+            min-height: 44px !important;
+            font-size: 15px !important;
+            margin-top: 0.15rem !important;
+          }
+          /* Compact legal text on mobile — Clerk renders its own Terms footer
+             inside the widget so the manual <p> below is redundant. */
+          .signup-auth-card > p {
+            padding: 4px 10px 8px !important;
+            font-size: 0.7rem !important;
+            border-top: none !important;
+          }
         }
       ` }} />
     </main>

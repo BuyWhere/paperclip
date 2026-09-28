@@ -404,7 +404,7 @@ const tiersGridResponsiveStyle = `
   @media (max-height: 960px) {
     .pricing-inner { padding-top: 1.5rem !important; padding-bottom: 2rem !important; }
     .pricing-page h1 { margin-bottom: 0.5rem !important; font-size: 1.7rem !important; }
-    .tiers-grid { margin-bottom: 2rem; gap: 0.75rem; }
+    .tiers-grid { margin-bottom: 2rem; gap: 2rem; }
     .tier-card { padding: 0.95rem !important; gap: 0.4rem !important; }
     .tier-card ul { gap: 0.2rem !important; }
     .tier-card ul li { line-height: 1.25 !important; font-size: 0.78rem !important; }
@@ -418,7 +418,7 @@ const tiersGridResponsiveStyle = `
     .pricing-inner { padding-top: 1rem !important; padding-bottom: 1.5rem !important; }
     .pricing-page h1 { margin-bottom: 0.25rem !important; font-size: 1.5rem !important; }
     .pricing-page > div > p:nth-of-type(2) { display: none; }
-    .tiers-grid { margin-bottom: 1.5rem; gap: 0.5rem; }
+    .tiers-grid { margin-bottom: 1.5rem; gap: 1.5rem; }
     .tier-card { padding: 0.75rem !important; gap: 0.25rem !important; border-radius: 12px !important; }
     .tier-card > div:first-child > div:first-child { top: -6px !important; font-size: 0.6rem !important; padding: 0.15rem 0.5rem !important; }
     /* DOM order: header(div#1) > desc(p#2) > ul(ul#3) > footer(div#4).
@@ -439,6 +439,21 @@ const tiersGridResponsiveStyle = `
   }
   /* OS-5960: prevent mid-word breaks in card text */
   .tier-card { word-wrap: break-word; overflow-wrap: break-word; }
+  /* OS-7628 r2: restore 2rem gap on desktop regardless of viewport height.
+     Earlier max-height media queries (960px/820px) compressed gap to 0.75rem/0.5rem,
+     causing ~20px gaps on 1440x900. The 2rem gap is the design intent. */
+  @media (min-height: 961px) {
+    .tiers-grid { gap: 2rem !important; }
+  }
+  /* OS-7628 r2: add explicit light-mode .cta-primary styles. Without these,
+     the button inherits transparent bg + no color = white text on card bg,
+     which is ~1.6:1 contrast (FAIL). Use the same gold as .cta-secondary
+     (#7A5A1E on light = 5.74:1). */
+  .pricing-page .cta-primary {
+    background: transparent;
+    border-color: #7A5A1E;
+    color: #7A5A1E;
+  }
   /* OS-5914 / OS-5938: keep 4-col at widths ≥1101px (VidMee 1440x900
      baseline). CTAs sit above the feature list so they share a fold
      row even without subgrid. */
@@ -447,6 +462,7 @@ const tiersGridResponsiveStyle = `
   }
   @media (max-width: 600px) {
     .tiers-grid { grid-template-columns: 1fr !important; align-items: stretch; }
+    .pricing-inner { padding: 24px 20px !important; margin: 0 16px !important; }
   }
   @media (max-width: 800px) {
     .quotes-grid { grid-template-columns: 1fr !important; }
@@ -487,13 +503,13 @@ const tiersGridResponsiveStyle = `
 `;
 
 const pageStyle: React.CSSProperties = { background: 'var(--color-bg-primary)', color: 'var(--color-text-primary)', minHeight: '100vh', paddingBottom: '6rem' };
-const innerStyle: React.CSSProperties = { maxWidth: '1200px', margin: '0 auto', padding: '3.5rem 2rem', minWidth: 0 };
+const innerStyle: React.CSSProperties = { maxWidth: '1200px', margin: '0 auto', padding: '3.5rem 16px', minWidth: 0 };
 const headerStyle: React.CSSProperties = { textAlign: 'center', marginBottom: '1rem' };
 const eyebrowStyle: React.CSSProperties = { margin: '0 0 0.75rem', fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--color-text-primary)' };
 const pageTitleStyle: React.CSSProperties = { margin: '0 0 1rem', fontSize: 'clamp(1.4rem, 6vw, 2.25rem)', lineHeight: 1.15, letterSpacing: '-0.035em', fontWeight: 800 };
 const pageDescStyle: React.CSSProperties = { margin: 0, fontSize: '1.1rem', color: 'var(--color-text-secondary)', maxWidth: '480px', marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.65 };
 
-const tiersGridStyle: React.CSSProperties = { display: 'grid', gap: '1.25rem', alignItems: 'stretch' };
+const tiersGridStyle: React.CSSProperties = { display: 'grid', gap: '2rem', alignItems: 'stretch' };
 
 const tierCardStyle: React.CSSProperties = { position: 'relative', padding: '1.35rem', borderRadius: '20px', border: '1px solid var(--color-border)', background: 'var(--color-bg-card)', display: 'flex', flexDirection: 'column', gap: '0.85rem', overflow: 'visible', height: '100%' };
 const tierHighlightedStyle: React.CSSProperties = { border: '2px solid #C87055', background: 'var(--color-accent-soft)', boxShadow: '0 0 0 1px var(--color-accent-soft)' };

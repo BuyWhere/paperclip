@@ -1,0 +1,2 @@
+# OS-6161 product surface + waitlist aliases deploy trigger 2026-09-23T05:58Z
+# OS-7863: triggering Railway rebuild for /api/reveal route

@@ -43,13 +43,17 @@ const INK = 'var(--color-text-primary)'
 const GRAY = 'var(--color-text-secondary)'
 const CREAM = 'var(--color-bg-primary)'
 const SURFACE = 'var(--color-bg-card)'
-// Theme-aware gold: light --color-accent #7E5C24 on cream ≈ 5.51:1;
+// Theme-aware gold: light --color-accent #7E5C24 on cream = 5.71:1;
 // dark --color-accent #d4a366 on charcoal ≈ 7.85:1 (OS-5952). Using accent
 // instead of accent-border because accent-border #9A7A3A fails 4.5:1 in dark
 // (4.44:1). OS-6800.
 const GOLD = 'var(--color-accent)'
-/** OS-7128: eyebrow tags on dark charcoal. #E5C396 on #221F1A = 9.20:1 (AA/AAA). */
-const GOLD_ON_DARK = '#E5C396'
+/** OS-8064 r2: hardcoded #E5C396 is invisible on cream light sections (1.56:1);
+ * var(--color-accent) resolves #7E5C24 (5.71:1) light / #d4a366 (7.85:1) dark. */
+const GOLD_ON_DARK = 'var(--color-accent)'
+/** OS-8064 r2: #B8862F computed 2.93:1 on cream (fails AA); the 5.94:1 claim
+ * was wrong. var(--color-accent) resolves #7E5C24 (5.71:1) light. */
+const GOLD_ON_CREAM = 'var(--color-accent)'
 const HAIRLINE = 'var(--color-border)'
 const OXBLOOD = 'var(--color-accent-2)'
 const MAXW = 1360
@@ -184,7 +188,7 @@ export default function Home() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'minmax(0, 1.35fr) minmax(0, 1fr)',
+            gridTemplateColumns: 'minmax(0, 1.5fr) minmax(0, 1fr)',
             gap: '3.5rem',
             alignItems: 'center',
           }}
@@ -214,6 +218,7 @@ export default function Home() {
                 letterSpacing: '-0.02em',
                 margin: '0 0 1.25rem',
                 color: INK,
+                maxWidth: '40rem',
               }}
             >
               Right goal, right season.
@@ -233,7 +238,7 @@ export default function Home() {
                 fontSize: '1.1875rem',
                 lineHeight: 1.6,
                 color: GRAY,
-                maxWidth: '34rem',
+                maxWidth: '38rem',
                 margin: '0 0 2.25rem',
               }}
             >
@@ -315,7 +320,6 @@ export default function Home() {
                 style={{
                   fontFamily: serif,
                   fontSize: '1.5rem',
-                  color: GOLD,
                   marginBottom: '1rem',
                 }}
               >
@@ -473,7 +477,6 @@ export default function Home() {
               fontWeight: 600,
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
-              color: GOLD_ON_DARK,
               marginBottom: '1rem',
             }}
           >
@@ -566,7 +569,6 @@ function SectionHead({
           fontWeight: 600,
           letterSpacing: '0.14em',
           textTransform: 'uppercase',
-          color: GOLD_ON_DARK,
           marginBottom: '0.9rem',
         }}
       >

@@ -147,12 +147,16 @@ export function renderSources(
     if (!c) continue
     const sk = j.kind === 'free' ? 'journal' : 'reflection'
     L.push(`[${sk}#${j.id}${j.mood ? ` mood=${j.mood}` : ''}] ${c}`)
-    userTextLength += c.length
+    userTextLength += c.length // journals/reflections are user-authored
   }
   for (const m of messages) {
     const c = (m.content ?? '').trim()
     if (!c) continue
     L.push(`[chat#${m.id} ${m.role}] ${c}`)
+    // OS-7620: only USER turns count toward "did the user actually say
+    // anything". Assistant check-ins are template prose the bot generated —
+    // a window containing only them has nothing durable to extract, and
+    // counting them made every quiet day look like an extraction miss.
     if (m.role === 'user') userTextLength += c.length
   }
   return { text: L.join('\n'), hasContent: L.length > 0, userTextLength }
@@ -334,14 +338,16 @@ function tryParse(s: string): unknown {
  * "JSON only" prompt and a higher token cap. Two independent samples make the
  * clearly-extractable 0-item first pass vanishingly rare.
  */
-async function distill(sourceText: string): Promise<{
+async function distill(sourceText: string, userTextLength: number): Promise<{
   memory: CandidateMemory[]
   commitments: CandidateCommitment[]
   usedLlm: boolean
   parsed: boolean
   attempts: number
 }> {
-  const nonTrivial = sourceText.trim().length > 200
+  // OS-7620: non-trivial = the USER authored real content this window, not the
+  // bot. Assistant-only windows are legitimately empty; don't retry or alarm.
+  const nonTrivial = userTextLength > 200
 
   const attempt = async (
     system: string,
@@ -409,7 +415,11 @@ export async function consolidateUser(userId: string, opts: { at?: Date } = {}):
     const { text, hasContent, userTextLength } = renderSources(journals, messages)
     if (!hasContent) return { ...empty, reason: 'no source in window' }
 
-    const { memory, commitments, usedLlm, parsed, attempts } = await distill(text)
+    // OS-7620: a window where the user authored nothing durable-worthy (no
+    // journals and only assistant chatter) is expected-empty, not a miss.
+    if (userTextLength === 0) return { ...empty, reason: 'no user-authored content in window' }
+
+    const { memory, commitments, usedLlm, parsed, attempts } = await distill(text, userTextLength)
     if (memory.length === 0 && commitments.length === 0) {
       // OS-7620: only fire PostHog for genuine parse failures on USER-authored
       // non-trivial windows. Parsed-empty (LLM correctly found nothing) and
@@ -417,7 +427,7 @@ export async function consolidateUser(userId: string, opts: { at?: Date } = {}):
       const userNonTrivial = userTextLength > 200
       if (userNonTrivial && !parsed) {
         try {
-          captureServerException(
+          void captureServerException(
             new Error('memory consolidation yielded 0 candidates on non-trivial input'),
             {
               route: 'memory/extract:consolidateUser',
