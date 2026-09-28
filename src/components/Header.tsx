@@ -29,6 +29,10 @@ const HAIRLINE_STRONG = 'var(--color-border-strong)';
 const CREAM = 'var(--color-bg-primary)';
 const GOLD = 'var(--color-accent)';
 const OXBLOOD = '#C06B54';
+// OS-8164: /signup and /login sit on a light beige canvas. Theme tokens
+// (--color-text-primary/secondary) flip to cream/white when data-theme=dark,
+// yielding ~1.1–1.9:1 on #f5f0e8. Pin literal stone-900 ink (~15:1).
+const AUTH_INK = '#1c1917';
 
 const NAV_LINKS = [
   { href: '/features', label: 'Features' },
@@ -207,7 +211,7 @@ export function Header() {
               fontFamily: 'var(--font-serif-header), Georgia, serif',
               fontSize: '1.3rem',
               fontWeight: 600,
-              color: INK,
+              color: isAuthRoute ? AUTH_INK : INK,
               letterSpacing: '-0.01em',
             }}
           >
@@ -227,7 +231,11 @@ export function Header() {
                 style={{
                   fontSize: '0.9375rem',
                   fontWeight: 500,
-                  color: pathname.startsWith(href) ? INK : GRAY,
+                  color: isAuthRoute
+                    ? AUTH_INK
+                    : pathname.startsWith(href)
+                      ? INK
+                      : GRAY,
                   textDecoration: 'none',
                   transition: 'color 0.15s',
                 }}
@@ -257,7 +265,7 @@ export function Header() {
             flexShrink: 0,
           }}
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={INK} strokeWidth="2" strokeLinecap="round">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={isAuthRoute ? AUTH_INK : INK} strokeWidth="2" strokeLinecap="round">
             {mobileMenuOpen ? (
               <>
                 <line x1="5" y1="5" x2="19" y2="19" />
@@ -309,7 +317,7 @@ export function Header() {
             {pathname !== '/login' && (
               <Link
                 href="/login"
-                style={{ fontSize: '0.9375rem', fontWeight: 600, color: INK, textDecoration: 'none', whiteSpace: 'nowrap' }}
+                style={{ fontSize: '0.9375rem', fontWeight: 600, color: isAuthRoute ? AUTH_INK : INK, textDecoration: 'none', whiteSpace: 'nowrap' }}
               >
                 Log in
               </Link>
@@ -320,7 +328,7 @@ export function Header() {
             {pathname !== '/login' && (
               <Link
                 href="/login"
-                style={{ fontSize: '0.9375rem', fontWeight: 600, color: INK, textDecoration: 'none', whiteSpace: 'nowrap' }}
+                style={{ fontSize: '0.9375rem', fontWeight: 600, color: isAuthRoute ? AUTH_INK : INK, textDecoration: 'none', whiteSpace: 'nowrap' }}
               >
                 Log in
               </Link>
@@ -331,7 +339,7 @@ export function Header() {
                 account menu + a way back into the app, never Log in/Sign up. */}
             <Link
               href="/dashboard"
-              style={{ fontSize: '0.9375rem', fontWeight: 600, color: INK, textDecoration: 'none', whiteSpace: 'nowrap' }}
+              style={{ fontSize: '0.9375rem', fontWeight: 600, color: isAuthRoute ? AUTH_INK : INK, textDecoration: 'none', whiteSpace: 'nowrap' }}
             >
               Dashboard
             </Link>
@@ -364,7 +372,7 @@ export function Header() {
                     padding: '0.75rem 0',
                     fontSize: '1.0625rem',
                     fontWeight: 500,
-                    color: INK,
+                    color: isAuthRoute ? AUTH_INK : INK,
                     textDecoration: 'none',
                     borderBottom: `1px solid ${HAIRLINE}`,
                   }}
@@ -405,7 +413,7 @@ export function Header() {
                   borderRadius: '10px',
                   fontSize: '1rem',
                   fontWeight: 600,
-                  color: INK,
+                  color: isAuthRoute ? AUTH_INK : INK,
                   textDecoration: 'none',
                 }}
               >
@@ -438,9 +446,23 @@ export function Header() {
             background: transparent !important;
             background-color: transparent !important;
           }
+          header.marketing-header.marketing-header-auth nav.header-nav-links a,
+          header.marketing-header.marketing-header-auth a[href="/"],
+          header.marketing-header.marketing-header-auth a[href="/login"],
+          header.marketing-header.marketing-header-auth a[href="/dashboard"],
+          header.marketing-header.marketing-header-auth .header-mobile-menu a {
+            color: #1c1917 !important;
+          }
+          header.marketing-header.marketing-header-auth button.header-hamburger svg {
+            stroke: #1c1917 !important;
+          }
           header.marketing-header nav.header-nav-links a:hover,
           header.marketing-header nav.header-nav-links a:focus-visible {
             color: var(--color-text-primary) !important;
+          }
+          header.marketing-header.marketing-header-auth nav.header-nav-links a:hover,
+          header.marketing-header.marketing-header-auth nav.header-nav-links a:focus-visible {
+            color: #1c1917 !important;
           }
           header.marketing-header a[href="/login"]:hover,
           header.marketing-header a[href="/dashboard"]:hover,
