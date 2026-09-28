@@ -242,18 +242,13 @@ body.signup-auth header.marketing-header {
   -webkit-backdrop-filter: blur(12px) !important;
   border-bottom-color: var(--color-border) !important;
 }
+/* OS-8164: pin literal dark ink, NOT a theme variable. Under data-theme="dark"
+   --color-text-primary resolves to cream #EDE7DD on this pinned light header —
+   the exact white-on-beige QA defect. Same OS-5953 pattern; literal hex is
+   theme-proof. Inline AUTH_INK in Header.tsx is redundant but harmless. */
 body.login-auth header.marketing-header *,
 body.signup-auth header.marketing-header * {
-  color: var(--color-text-primary) !important;
-}
-/* Dark mode: keep the auth-page header warm, not the default dark charcoal. */
-body.login-auth[data-theme="dark"] header.marketing-header,
-body.signup-auth[data-theme="dark"] header.marketing-header {
-  background: rgba(26, 23, 18, 0.85) !important;
-}
-body.login-auth[data-theme="dark"] header.marketing-header *,
-body.signup-auth[data-theme="dark"] header.marketing-header * {
-  color: var(--color-text-primary) !important;
+  color: #1c1917 !important;
 }
 
 /* ── Contact form affordance overrides ─────────────────────────────────────
