@@ -242,7 +242,7 @@ export default function PricingPage() {
                 {tier.id === 'agent-connect' && (
                   <p style={ctaGuaranteeLineStyle}>Cancel anytime — no annual lock-in</p>
                 )}
-                <p style={bestForLabelStyle}>Best for: <span style={bestForTextStyle}>{tier.bestFor}</span></p>
+                <p style={bestForLabelStyle}><span style={bestForLabelTextStyle}>Best for:</span> <span style={bestForTextStyle}>{tier.bestFor}</span></p>
               </div>
             </div>
           ))}
@@ -567,8 +567,11 @@ const featureCheckStyle = (included: boolean): React.CSSProperties => ({
 const tierFooterStyle: React.CSSProperties = { borderTop: '1px solid var(--color-border)', borderBottom: '1px solid var(--color-border)', paddingTop: '1rem', paddingBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', overflow: 'visible' };
 // OS-6350: "Best for" text varies 34-77 chars, causing footer heights to differ
 // and CTA buttons to misalign. Set min-height to normalize footer height.
-const bestForLabelStyle: React.CSSProperties = { margin: 0, fontSize: '0.78rem', color: 'var(--color-text-secondary)', fontWeight: 600, minHeight: '2.4em', display: 'flex', alignItems: 'flex-start' };
-const bestForTextStyle: React.CSSProperties = { fontWeight: 400, color: 'var(--color-text-secondary)' };
+// OS-8350: label was colliding with audience text at 1440x900 ("BestAI power users").
+// Flex + gap + flex-shrink:0/min-width on the label keeps "Best for:" distinct.
+const bestForLabelStyle: React.CSSProperties = { margin: 0, fontSize: '0.78rem', color: 'var(--color-text-secondary)', fontWeight: 600, minHeight: '2.4em', display: 'flex', alignItems: 'flex-start', gap: '0.4rem' };
+const bestForLabelTextStyle: React.CSSProperties = { flexShrink: 0, minWidth: 'max-content', whiteSpace: 'nowrap' };
+const bestForTextStyle: React.CSSProperties = { fontWeight: 400, color: 'var(--color-text-secondary)', minWidth: 0 };
 const ctaGuaranteeLineStyle: React.CSSProperties = { margin: 0, textAlign: 'center', fontSize: '0.78rem', color: 'var(--color-text-secondary)', fontWeight: 500 };
 const quotesSectionStyle: React.CSSProperties = { marginBottom: '4rem' };
 const quotesSubStyle: React.CSSProperties = { margin: '-0.75rem 0 1.5rem', fontSize: '0.92rem', color: 'var(--color-text-secondary)', lineHeight: 1.6, maxWidth: '560px' };
