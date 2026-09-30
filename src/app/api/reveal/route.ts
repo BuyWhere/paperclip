@@ -66,25 +66,29 @@ export async function POST(req: NextRequest) {
   // Accept `date` as an alias — some clients / probes send YYYY-MM-DD under
   // that key. Canonical field remains birthDate.
   const rawDate = body.birthDate || (typeof (body as { date?: unknown }).date === 'string' ? (body as { date?: string }).date : undefined)
+  const userArchetypeEarly = typeof body.archetype === 'string' ? body.archetype.trim() : ''
 
-  // OS-8062: archetype-only mode — user selected their archetype without providing
-  // a birth date. birthDate is only required when archetype is NOT provided.
-  let birthDate: string
-  let dateParsed = parseBirthDate(rawDate)
-  if (!dateParsed.ok) {
-    if (body.archetype) {
-      // archetype-only mode: use a safe default date that won't crash BaZi. The
-      // archetypeOverride path in generateArchetype returns correct name/desc
-      // regardless of the date used for pillar math.
-      const safeDate = '1990-01-01'
-      birthDate = safeDate
-      dateParsed = { ok: true, year: 1990, month: 1, day: 1 }
-    } else {
-      return NextResponse.json({ error: 'Please enter a valid birth date (YYYY-MM-DD).' }, { status: 400 })
-    }
-  } else {
-    birthDate = rawDate as string
+  // OS-8221 / OS-8062: archetype-only taste (no birthDate). Prod 8os.ai is the
+  // Next app on Railway, not a FastAPI proxy — this handler is the live path.
+  if (!rawDate && userArchetypeEarly) {
+    return NextResponse.json({
+      archetypeName: userArchetypeEarly,
+      description: `${userArchetypeEarly} — a named taste of your 8os path.`,
+      element: null,
+      elementLabel: null,
+      dayMasterEn: null,
+      sunSignName: null,
+      phaseLabel: null,
+      phaseTeaser: null,
+      mode: 'archetype-only',
+    })
   }
+
+  const parsed = parseBirthDate(rawDate)
+  if (!parsed.ok) {
+    return NextResponse.json({ error: 'Please enter a valid birth date (YYYY-MM-DD).' }, { status: 400 })
+  }
+  const birthDate = rawDate as string
   const birthTime = parseBirthTime(body.birthTime)
   // birthLocation is accepted so the public form can collect it, but BaZi
   // year/month/day pillars are solar-calendar (not Western longitude). Hour
@@ -102,8 +106,10 @@ export async function POST(req: NextRequest) {
       birthDate,
       birthTime,
       personalityCode: 'sg',
-      archetypeOverride: body.archetype || undefined,
     })
+
+    // OS-8062: Override archetypeName if user provided one
+    const archetypeName = userArchetype || result.archetypeName
 
     // Honest "current phase" teaser from the real phase engine (annual 流年
     // layer — HIGH confidence). Nothing here is faked.
@@ -111,7 +117,7 @@ export async function POST(req: NextRequest) {
     let phaseLabel: string | null = null
     try {
       // Extract date parts into local lets so TypeScript's narrowing sticks.
-      const y = dateParsed.year, m = dateParsed.month, d = dateParsed.day
+      const y = parsed.year, m = parsed.month, d = parsed.day
       const bazi = calculateBazi(y, m, d, birthTime ? Number(birthTime.split(':')[0]) : undefined)
       const strength = calculateDayMasterStrength(bazi).strength
       const phases = computePhases({
@@ -133,15 +139,6 @@ export async function POST(req: NextRequest) {
     } catch {
       // Phase teaser is a bonus — never fail the reveal if it can't compute.
       phaseTeaser = null
-    }
-
-    let archetypeName = result.archetypeName
-    // OS-7844 / OS-7451: never leak JS "undefined" or Unknown sentinel into
-    // the public reveal payload, even if a stale hash slot still fires.
-    if (!archetypeName || /undefined|Unknown/i.test(archetypeName)) {
-      const elem = (ELEMENT_LABEL[result.dayElement] ?? result.dayElement) || 'Core'
-      const sign = result.sunSignName || 'Star'
-      archetypeName = `The ${elem} ${sign}`
     }
 
     return NextResponse.json({

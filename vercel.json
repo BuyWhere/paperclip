@@ -11,7 +11,7 @@
   "rewrites": [
     {
       "source": "/api/reveal",
-      "destination": "https://orchestrator-production-1643.up.railway.app/api/reveal"
+      "destination": "/api/reveal"
     },
     {
       "source": "/telegram/webhook",
