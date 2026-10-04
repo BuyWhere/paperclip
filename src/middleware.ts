@@ -64,7 +64,12 @@ const clerk = clerkMiddleware(async (auth, req) => {
   const loginUrl = new URL('/login', req.url)
   loginUrl.searchParams.set('next', req.nextUrl.pathname)
   const loginUrlStr = loginUrl.toString()
-  const signupUrl = new URL('/signup', req.url).toString()
+  // OS-6475: pricing CTAs link to /onboarding?plan=<tier>; preserve the plan
+  // query across the auth redirect to /signup so SignupPlanIntent can pick it up.
+  const signupUrl = new URL('/signup', req.url)
+  const planParam = req.nextUrl.searchParams.get('plan')
+  if (planParam) signupUrl.searchParams.set('plan', planParam)
+  const signupUrlStr = signupUrl.toString()
 
   if (isAdminRoute(req)) {
     await auth.protect((has) => has({ role: 'org:admin' }), {
@@ -73,7 +78,7 @@ const clerk = clerkMiddleware(async (auth, req) => {
   } else if (isOnboardingRoute(req)) {
     // OS-3649: Public CTAs use "free" copy and link to /onboarding. Unauthenticated
     // users should land on /signup (not /login) to preserve conversion intent.
-    await auth.protect({ unauthenticatedUrl: signupUrl })
+    await auth.protect({ unauthenticatedUrl: signupUrlStr })
   } else if (isProtectedRoute(req)) {
     // QA/API probes: API routes carrying the X-QA-USER-ID header skip the Clerk
     // redirect and fall through to the route's requireAuth, which only honours
@@ -140,16 +145,6 @@ export default function middleware(req: NextRequest, event: NextFetchEvent) {
   // 307 so RSC prefetch (?_rsc=) and next.config misses still avoid the 404.
   if (pathname === '/docs' || pathname.startsWith('/docs/')) {
     return applyCSP(NextResponse.redirect(new URL('/developers', req.url), 307))
-  }
-
-  // OS-7223: production 8os.ai is Railway Next.js (x-railway-edge), not Vercel.
-  // vercel.json rewrites never fire there. The /api/count App Router handler
-  // is also missing from the stale Railway standalone build, so probes get
-  // HTML 404. Rewrite at the edge to the live FastAPI counter.
-  if (pathname === '/api/count') {
-    return applyCSP(
-      NextResponse.rewrite(new URL('https://api.8os.ai/api/waitlist/count')),
-    )
   }
 
   try {
