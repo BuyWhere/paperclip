@@ -11,6 +11,7 @@ const inter = Inter({ subsets: ['latin'], weight: ['400', '500', '600', '700'], 
 import { MetaPixel } from '@/components/MetaPixel'
 import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
+import { MarketingPostHog } from '@/components/MarketingPostHog'
 import { ThemeProvider } from '@/components/ThemeProvider'
 import { THEME_BOOT_SCRIPT } from '@/lib/theme'
 import './globals.css'
@@ -139,6 +140,9 @@ export default function RootLayout({
                 NEXT_PUBLIC_META_PIXEL_ID is unset (local dev, pre-pixel deploys).
                 See src/components/MetaPixel.tsx. */}
             <MetaPixel />
+            <Suspense fallback={null}>
+              <MarketingPostHog />
+            </Suspense>
             <a href="#main-content" className="skip-link">
               Skip to content
             </a>

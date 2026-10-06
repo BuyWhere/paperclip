@@ -1,5 +1,6 @@
 'use client';
 
+import posthog from 'posthog-js';
 import { useState } from 'react';
 
 interface CheckoutButtonInnerProps {
@@ -31,6 +32,7 @@ export function CheckoutButtonInner({ tier, label, style, className }: CheckoutB
     setError(null);
 
     try {
+      posthog.capture('checkout_started', { tier });
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
